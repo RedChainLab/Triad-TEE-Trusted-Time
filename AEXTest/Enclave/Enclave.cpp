@@ -90,7 +90,7 @@ void countADD(void){
     /*
     The function that will be called in another thread to perform ADD operations.
     */
-    see_pid("countADD");
+    //see_pid("countADD");
     const char* args = NULL; 
     sgx_aex_mitigation_node_t node;
     sgx_register_aex_handler(&node, my_aex_notify_handler, (const void*)args);
@@ -111,7 +111,7 @@ void main_thread(int sleep_time, int core_id, int set_aff, int sleep_inside_encl
     /*
     the main thread that will be called by the application.
     */
-    see_pid("main_thread");
+    //see_pid("main_thread");
     cond_struct_t *c = &cond;
     if (set_aff)
         set_affinity(core_id);
