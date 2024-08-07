@@ -385,7 +385,7 @@ int receive_udp_packet(node_connection& nc, long long* ts, int* already_sent, lo
             else if(fields[0] == CALIBRATION_COLD_START){
                 return CALIBRATION_COLD_START;
             }
-            else_if(fields[0] == TIMESTAMP){
+            else if(fields[0] == TIMESTAMP){
                 return TIMESTAMP;
             }
         }
