@@ -15,14 +15,9 @@ static cond_runtime_t runtime_scheduler = {NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
 static void my_aex_notify_handler(const sgx_exception_info_t *info, const void * args)
 {
-   // This sample will not perform any additional mitigations beyond what the trts
-   // does. It will do some simple counting.
    (void)info;
    (void)args;
-   
-   //aex_count++;
    is_out_of_enclave = true;
-   //t_print("is_out_of_enclave : %d\n", aex_count);
 }
 
 int communicate_with_trusted_server(SSL* ssl, int& i, uint64_t& mean_tsc_0, uint64_t& mean_tsc_500, uint32_t& count, cond_buffer_t* b, int waiting_time = 500)

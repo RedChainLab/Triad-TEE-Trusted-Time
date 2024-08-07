@@ -143,6 +143,7 @@ void Server::handle_client(node_connection &client){
         //received timestamps from the trusted server, the timestamps thus needs to be 
         //forwarded to the client
         else if(res == CALIBRATION_ASK_TIME || res == DELAYED || res == NOT_DELAYED){
+            //pas censé arriver
             t_print("SERVER : ts received from trusted server: %lld\n", runtime_scheduler->timestamps);
             sgx_thread_mutex_lock(&runtime_scheduler->mutex);
             if(epoch - runtime_scheduler->timestamps > 0){

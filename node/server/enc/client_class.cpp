@@ -224,6 +224,10 @@ int Client::calibrate(){
         runtime_scheduler->canSend = WAIT;
         sgx_thread_mutex_unlock(&runtime_scheduler->mutex);
     }
+
+    sgx_thread_mutex_lock(&runtime_scheduler->mutex);
+    runtime_scheduler->canSend = DELAYED;
+    sgx_thread_mutex_unlock(&runtime_scheduler->mutex);
     
     while(number_of_delayed_responses > 0){
         t_print("CLIENT : number_of_instant_responses : %d\n", number_of_delayed_responses);
@@ -358,7 +362,7 @@ int Client::run() {
         if(runtime_scheduler->shouldSend == 1){
             index = NB_TOTAL-2;
             unsigned char plaintext[200];
-            snprintf((char*)plaintext, sizeof(plaintext), "t;%lld", runtime_scheduler->timestamps);
+            snprintf((char*)plaintext, sizeof(plaintext), "t;%d;%lld", own_port,runtime_scheduler->timestamps);
             t_print("CLIENT : timestamp to forward : %lld\n", runtime_scheduler->timestamps);
             ciphertext_len = aes_encrypt(plaintext, strlen((char*)plaintext), node_connections[index].key, node_connections[index].iv, ciphertext);
             if (ciphertext_len == -1) {
@@ -400,12 +404,11 @@ int Client::run() {
                 if(node_connections[index].socket_fd != -1 && node_connections[index].is_connected == 1){
                     //if(runtime_scheduler->is_out_of_enclave == 0){
                     if(*out_enclave == 0){
-                        t_print("CLIENT : In enclave, nb_aex : %lld\n", runtime_scheduler->nb_aex);
                         sgx_thread_mutex_lock(&runtime_scheduler->mutex);
                         runtime_scheduler->isAsking = 0;
                         runtime_scheduler->index = -1;
                         unsigned char plaintext[200];
-                        snprintf((char*)plaintext, sizeof(plaintext), "t;%lld", runtime_scheduler->timestamps);
+                        snprintf((char*)plaintext, sizeof(plaintext), "t;%d;%lld", own_port, runtime_scheduler->timestamps);
                         ciphertext_len = aes_encrypt(plaintext, strlen((char*)plaintext), node_connections[index].key, node_connections[index].iv, ciphertext);
                         if (ciphertext_len == -1) {
                             t_print("Encryption failed.\n");
@@ -423,6 +426,7 @@ int Client::run() {
                         unsigned char plaintext[200];
                         nb_available_nodes = 0;
                         for(int i = 0; i < NB_NODE; i++){
+                            //look for an available node to ask
                             if(node_connections[i].socket_fd != -1 && node_connections[i].is_connected == 1){
                                 available_nodes[i] = node_connections[i].node_port;
                                 nb_available_nodes++;

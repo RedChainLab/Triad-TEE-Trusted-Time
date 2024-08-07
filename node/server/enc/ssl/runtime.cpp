@@ -10,29 +10,17 @@ static void my_aex_notify_handler(const sgx_exception_info_t *info, const void *
     cond_runtime_t *r = &runtime_scheduler;
    (void)info;
    (void)args;
-   //t_print("AEX count : %lld\n", aex_count);
-   //sgx_thread_mutex_lock(&r->mutex);
    r->nb_aex++;
     out_enc = true;
-   //t_print("AEX count : %lld\n", r->nb_aex);
-   //sgx_thread_mutex_unlock(&r->mutex);
-   //t_print("is_out_of_enclave : %d\n", aex_count);
 }
 
 void count_add(void){
     cond_runtime_t *r = &runtime_scheduler;
-    /*
-    while (!r->start_counting) {
-        sgx_thread_cond_wait(&r->startCounting, &r->mutex);
-    }
-    */
-    //sgx_thread_mutex_lock(&r->mutex);
     while(1){
         if(r->isCounting == 1){
             r->count++;
         }
     }
-    //sgx_thread_mutex_unlock(&r->mutex);
 }
 
 
@@ -63,6 +51,5 @@ void readTS(){
         r->timestamps += r->epoch;
         sgx_thread_mutex_unlock(&r->mutex);
     }
-    //sgx_thread_mutex_unlock(&r->mutex);
     sgx_unregister_aex_handler(my_aex_notify_handler);
 }
