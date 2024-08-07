@@ -238,16 +238,19 @@ void set_affinity(int core_id) {
     
 }
 
-void set_thread_affinity(std::thread& t, int core_id) {
+void set_thread_affinity(int core_id) {
     /*
     set the affinity of the current thread to the core_id
     */
+    pthread_t t = pthread_self();
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
     CPU_SET(core_id, &cpuset);
 
-    int s = pthread_setaffinity_np(t.native_handle(), sizeof(cpu_set_t), &cpuset);
-    
+    int s = pthread_setaffinity_np(t, sizeof(cpu_set_t), &cpuset);
+    if (s != 0) {
+        std::cerr << "Error setting thread affinity: " << strerror(s) << std::endl;
+    }
 }
 
 void see_pid(const char* str){
@@ -268,11 +271,15 @@ void ocall_sleep(int* sec) {
     printf("Done sleeping outside the enclave\n");
 }
 
-void add_thread(void)
+void ecall_add_thread(int set_aff)
 {
     /*
     the function that enters the enclave to perform ADD operations.
     */
+    if (set_aff)
+    {
+        set_thread_affinity(2);
+    }
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
     ret = countADD(global_eid);
     if (ret != SGX_SUCCESS)
@@ -284,6 +291,10 @@ void ecall_main_thread(int sleep_time, int core_id, int set_aff, int sleep_insid
     /*
     the function that enters the enclave to lanuch the main thread.
     */
+    if (set_aff)
+    {
+        set_thread_affinity(1);
+    }
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
     ret = main_thread(global_eid, sleep_time, core_id, set_aff, sleep_inside_enclave);
     if (ret != SGX_SUCCESS)
@@ -297,9 +308,7 @@ void start_threads(int sleep_time, int core_id, int set_aff, int sleep_inside_en
     */
     //printf("Info: Starting both threads...  \n");
     std::thread calib(ecall_main_thread, sleep_time, core_id, set_aff, sleep_inside_enclave);
-    set_thread_affinity(calib, 1);
-    std::thread add(add_thread);
-    set_thread_affinity(add, 2);
+    std::thread add(ecall_add_thread, set_aff);
     calib.join();
     add.join();
 
@@ -316,6 +325,7 @@ int SGX_CDECL main(int argc, char *argv[])
         //printf("Usage: %s <sleep_time> <core_id> <set_affinity><sleep_inside_enclave>\n", argv[0]);
         return -1;
     }
+        //see_pid("countADD");
     int sleep_time = atoi(argv[1]);
     int core_id = atoi(argv[2]);
     int set_aff = atoi(argv[3]);
