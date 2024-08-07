@@ -142,6 +142,7 @@ void Server::handle_client(node_connection &client){
         }
         //received timestamps from the trusted server, the timestamps thus needs to be 
         //forwarded to the client
+        /*
         else if(res == CALIBRATION_ASK_TIME || res == DELAYED || res == NOT_DELAYED){
             //pas censé arriver
             t_print("SERVER : ts received from trusted server: %lld\n", runtime_scheduler->timestamps);
@@ -153,6 +154,7 @@ void Server::handle_client(node_connection &client){
             runtime_scheduler->shouldSend = 1;
             sgx_thread_mutex_unlock(&runtime_scheduler->mutex);
         }
+        */
         //A timestamps was asked by res nodes. already_asked is updated to inform the client
         //side which nodes needs to receive the timestamps
         else if(res == PORT){

@@ -376,7 +376,6 @@ int receive_udp_packet(node_connection& nc, long long* ts, int* already_sent, lo
         }
         else if(ret == CALIBRATION){
             *epoch = temp_ts;
-            t_print("COMMON : type received : %d\n" , type);
             if(fields[0] == NOT_DELAYED){//no delay
                 return NOT_DELAYED;
             }
@@ -465,7 +464,7 @@ int parseMessage(const char* message, long long int* temp_ts, int* fields, int* 
         return PORT; // Return the count of numbers
     }
     else if (message[0] == 't'){//format "t;<own_port>;<timestamp>"
-        char* tempStr = strdup(message+2);
+        char* tempStr = strndup(message+2, strlen(message)-2);
         char* token = strtok(tempStr, ";");
         fields[0] = atoi(token);
         token = strtok(nullptr, ";");
@@ -480,7 +479,7 @@ int parseMessage(const char* message, long long int* temp_ts, int* fields, int* 
         for (const char* p = message+2; *p; ++p) {
             if (*p == ';') ++count;
         }
-        char* tempStr = strdup(message+2);
+        char* tempStr = strndup(message+2, strlen(message)-2);
         char* token = strtok(tempStr, ";");
         fields[0] = atoi(token);
         token = strtok(tempStr, ";");
