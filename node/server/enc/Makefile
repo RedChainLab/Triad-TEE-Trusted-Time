@@ -48,13 +48,6 @@ all:
 
 build:
 	@ echo "Compilers used: $(CC), $(CXX)"
-	$(SGX_EDGER8R) ../../client/tls_client.edl --trusted \
-		--search-path . \
-		--search-path $(INCDIR) \
-		--search-path $(SOCKET_DIR)/include \
-		--search-path ../../common \
-		--search-path $(SGXSSL_PKG_PATH)/include
-
 	$(SGX_EDGER8R) ../tls_server.edl --trusted \
 		--search-path . \
 		--search-path $(INCDIR) \
