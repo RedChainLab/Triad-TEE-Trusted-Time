@@ -233,8 +233,20 @@ void set_affinity(int core_id) {
     if (result != 0) {
         std::cerr << "Error setting thread affinity: " << strerror(result) << std::endl;
     } else {
-        std::cout << "Thread affinity set to CPU " << core_id << std::endl;
+        //std::cout << "Thread affinity set to CPU " << core_id << std::endl;
     }
+    
+}
+
+void set_thread_affinity(std::thread& t, int core_id) {
+    /*
+    set the affinity of the current thread to the core_id
+    */
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(core_id, &cpuset);
+
+    int s = pthread_setaffinity_np(t.native_handle(), sizeof(cpu_set_t), &cpuset);
     
 }
 
@@ -283,10 +295,11 @@ void start_threads(int sleep_time, int core_id, int set_aff, int sleep_inside_en
     /*
     intialize the threads and start them.
     */
-    printf("Info: Starting both threads...  \n");
+    //printf("Info: Starting both threads...  \n");
     std::thread calib(ecall_main_thread, sleep_time, core_id, set_aff, sleep_inside_enclave);
+    set_thread_affinity(calib, 1);
     std::thread add(add_thread);
-
+    set_thread_affinity(add, 2);
     calib.join();
     add.join();
 
@@ -300,24 +313,29 @@ int SGX_CDECL main(int argc, char *argv[])
     (void) argv;
     if(argc < 5)
     {
-        printf("Usage: %s <sleep_time> <core_id> <set_affinity><sleep_inside_enclave>\n", argv[0]);
+        //printf("Usage: %s <sleep_time> <core_id> <set_affinity><sleep_inside_enclave>\n", argv[0]);
         return -1;
     }
     int sleep_time = atoi(argv[1]);
     int core_id = atoi(argv[2]);
     int set_aff = atoi(argv[3]);
     int sleep_inside_enclave = atoi(argv[4]);
-    printf(" ==== Chosen configuration ====\n sleep_time: %d, core_id: %d, set_affinity: %d, sleep_inside_enclave: %d\n", sleep_time, core_id, set_aff, sleep_inside_enclave);
+    //printf(" ==== Chosen configuration ====\n sleep_time: %d, core_id: %d, set_affinity: %d, sleep_inside_enclave: %d\n", sleep_time, core_id, set_aff, sleep_inside_enclave);
     /* Configuration for Switchless SGX */
     sgx_uswitchless_config_t us_config = SGX_USWITCHLESS_CONFIG_INITIALIZER;
-    us_config.num_uworkers = 2;
-    us_config.num_tworkers = 2;
+    us_config.num_uworkers = 1;
+    us_config.num_tworkers = 1;
 
     /* Initialize the enclave */
     if(initialize_enclave(&us_config) < 0)
     {
         printf("Error: enclave initialization failed\n");
         return -1;
+    }
+
+    if (set_aff)
+    {
+        set_affinity(core_id);
     }
 
     start_threads(sleep_time, core_id, set_aff, sleep_inside_enclave);
