@@ -377,14 +377,17 @@ int receive_udp_packet(node_connection& nc, long long* ts, int* already_sent, lo
         else if(ret == CALIBRATION){
             *epoch = temp_ts;
             t_print("COMMON : type received : %d\n" , type);
-            if(fields[1] == NOT_DELAYED){//no delay
+            if(fields[0] == NOT_DELAYED){//no delay
                 return NOT_DELAYED;
             }
-            else if(fields[1] == DELAYED){//delayed
+            else if(fields[0] == DELAYED){//delayed
                 return DELAYED;
             }
-            else if(fields[1] == CALIBRATION_COLD_START){
+            else if(fields[0] == CALIBRATION_COLD_START){
                 return CALIBRATION_COLD_START;
+            }
+            else_if(fields[0] == TIMESTAMP){
+                return TIMESTAMP;
             }
         }
 
@@ -453,7 +456,7 @@ int parseMessage(const char* message, long long int* temp_ts, int* fields, int* 
         int index = 0;
 
         while (token != nullptr) {
-            (outArray)[index++] = atoi(token); // Convert and store
+            (fields)[index++] = atoi(token); // Convert and store
             token = strtok(nullptr, ";"); // Next token
         }
 
@@ -472,22 +475,19 @@ int parseMessage(const char* message, long long int* temp_ts, int* fields, int* 
         *nb_fields = 2;
         return TIMESTAMP;
     }
-    else if (message[0] == 'c'){//format "c;<own_port>;<type>;<waiting_time>"
+    else if (message[0] == 'c'){//format sent : "c;<own_port>;<type>;<waiting_time>", receive : "c;<type>;<timestamps>"
         t_print("COMMON : Calibration message\n");
         for (const char* p = message+2; *p; ++p) {
             if (*p == ';') ++count;
         }
         char* tempStr = strdup(message+2);
         char* token = strtok(tempStr, ";");
-        int index = 0;
-
-        while (token != nullptr) {
-            (fields)[index++] = atoi(token); // Convert and store
-            token = strtok(nullptr, ";"); // Next token
-        }
+        fields[0] = atoi(token);
+        token = strtok(tempStr, ";");
+        fields[1] = atoll(token);
 
         free(tempStr); // Free the duplicated string
-        *nb_fields = count;
+        *nb_fields = 2;
         return CALIBRATION; // Return the count of numbers
     }
     else{

@@ -116,7 +116,6 @@ int Server::handle_client(node_connection &client, int i){
     int waiting_time = 0;
     
     if(client.is_connected == 1){
-        //receive_udp_packet(client, client.socket_fd);
         int res = receive_udp_packet(client, client.socket_fd, client.key, client.iv, dest, &misc, &waiting_time);
         sync->mtx.lock();
         sync->waiting_time = waiting_time;
