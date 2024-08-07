@@ -297,9 +297,9 @@ void start_threads(int sleep_time, int core_id, int set_aff, int sleep_inside_en
     */
     //printf("Info: Starting both threads...  \n");
     std::thread calib(ecall_main_thread, sleep_time, core_id, set_aff, sleep_inside_enclave);
-    set_thread_affinity(calib, 2);
+    set_thread_affinity(calib, 1);
     std::thread add(add_thread);
-    set_thread_affinity(add, 3);
+    set_thread_affinity(add, 2);
     calib.join();
     add.join();
 
