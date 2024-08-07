@@ -113,9 +113,6 @@ void main_thread(int sleep_time, int core_id, int set_aff, int sleep_inside_encl
     */
     //see_pid("main_thread");
     cond_struct_t *c = &cond;
-    if (set_aff)
-        set_affinity(core_id);
-
     /*    
     const char* args = NULL; 
     sgx_aex_mitigation_node_t node;
