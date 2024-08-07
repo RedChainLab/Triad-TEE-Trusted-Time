@@ -18,6 +18,12 @@ void start_client(int* node_port) {
 }
 
 int main(int argc, char** argv) {
+
+    if (argc < 5) {
+        std::cerr << "<node1_port>: " << argv[1] << "<node2_port>: " << argv[2] << " <server_port>" << argv[3] << std::endl;
+        return 1;
+    }
+
     int own_port = atoi(argv[1]);
 
     int node1_port = atoi(argv[2]);
@@ -27,10 +33,6 @@ int main(int argc, char** argv) {
 
     int node_port[3] = {node1_port, node2_port, node3_port};
 
-    if (argc < 5) {
-        std::cerr << "<node1_port>: " << argv[1] << "<node2_port>: " << argv[2] << " <server_port>" << argv[3] << std::endl;
-        return 1;
-    }
     std::thread server_thread(start_server, own_port);
     sleep(1); // Ensure server starts before client
     std::thread client_thread(start_client, node_port);
