@@ -193,6 +193,9 @@ void Server::handle_client(node_connection &client){
         else if(res == PORT){
             t_print("SERVER : received request from %d nodes\n", res);
         }
+        else{
+            t_print("SERVER : received unknown message\n");
+        }
         runtime_scheduler->epoch = epoch;
         runtime_scheduler->epoch -= runtime_scheduler->timestamps;
         sgx_thread_mutex_unlock(&runtime_scheduler->mutex);
