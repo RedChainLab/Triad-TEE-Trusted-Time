@@ -187,14 +187,9 @@ void Server::handle_client(node_connection &client){
             runtime_scheduler->canSend = NOT_DELAYED;
             //t_print("SERVER : canSend : %d\n", runtime_scheduler->canSend);
         }
-        else if (res == TIMESTAMP){
-            t_print("SERVER : ts received from other node : %lld\n", runtime_scheduler->timestamps);     
-        }
-        else if(res == PORT){
-            t_print("SERVER : received request from %d nodes\n", res);
-        }
         else{
             t_print("SERVER : received unknown message\n");
+            runtime_scheduler->canSend = NOT_DELAYED;
         }
         runtime_scheduler->epoch = epoch;
         runtime_scheduler->epoch -= runtime_scheduler->timestamps;

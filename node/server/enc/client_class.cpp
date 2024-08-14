@@ -239,7 +239,9 @@ int Client::calibrate(){
         calibration_end_tsc = runtime_scheduler->timestamps;
         if(runtime_scheduler->canSend == DELAYED){
             if(calibration_end_tsc-calibration_start_tsc > 0 && calibration_end_tsc-calibration_start_tsc < 1000000000000000){
+                sgx_thread_mutex_lock(&runtime_scheduler->mutex);
                 number_of_delayed_responses--;
+                sgx_thread_mutex_unlock(&runtime_scheduler->mutex);
                 mean_tsc_500 += calibration_end_tsc - calibration_start_tsc;
                 t_print("CLIENT : 0 ms end-start : %lld\n", calibration_end_tsc-calibration_start_tsc);
             }
@@ -266,7 +268,7 @@ int Client::calibrate(){
     sgx_thread_mutex_unlock(&runtime_scheduler->mutex);
 
     while(number_of_instant_responses > 0){
-        t_print("CLIENT : number_of_delayed_responses : %d\n", number_of_instant_responses);
+        t_print("CLIENT : number_of_instant_responses : %d\n", number_of_instant_responses);
         while(runtime_scheduler->canSend == WAIT){
             continue;
         }
@@ -346,8 +348,8 @@ int Client::run() {
         available_nodes[0] = -1;
         available_nodes[1] = -1;
         unsigned char ciphertext[128];
-
         establish_socket();
+        
         for(int i = 0; i < NB_TOTAL; i++){
             if(node_connections[i].socket_fd != -1 && node_connections[i].is_connected == 0){
                 t_print("CLIENT : exchanging key with node %d\n", node_connections[i].node_port);
