@@ -135,11 +135,12 @@ void Server::handle_client(node_connection &client){
             t_print("SERVER : ts received from other node : %lld\n", runtime_scheduler->timestamps);
             sgx_thread_mutex_lock(&runtime_scheduler->mutex);
             if(epoch - runtime_scheduler->timestamps > 0){
+                runtime_scheduler->shouldSend = 1;
                 runtime_scheduler->epoch = epoch;
                 runtime_scheduler->epoch -= runtime_scheduler->timestamps;
             }
             sgx_thread_mutex_unlock(&runtime_scheduler->mutex);       
-        }
+        }  
         //received timestamps from the trusted server, the timestamps thus needs to be 
         //forwarded to the client
         /*
