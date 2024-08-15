@@ -50,7 +50,8 @@ int Client::create_socket(const char* server_ip, int port) {
     int sock;
     int ret;
     struct sockaddr_in addr;
-    sock = socket(AF_INET, SOCK_STREAM, 0);
+    //sock = socket(AF_INET, SOCK_STREAM, 0);
+    sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0) {
         t_print("Unable to create socket");
         return -1;

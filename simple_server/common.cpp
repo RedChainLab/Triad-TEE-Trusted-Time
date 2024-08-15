@@ -296,7 +296,8 @@ void send_udp_packet(node_connection& nc, const char* server_ip, int server_port
     while (retries > 0) {
         t_print("Sending UDP packet\n");
         //bytes_sent = sendto(sockfd, message, message_len, 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
-        bytes_sent = send(sockfd, message, message_len, MSG_NOSIGNAL);
+        bytes_sent = sendto(sockfd, message, message_len, MSG_NOSIGNAL, (struct sockaddr *)&server_addr, sizeof(server_addr));
+        //bytes_sent = send(sockfd, message, message_len, MSG_NOSIGNAL);
         if (bytes_sent == -1) {
             nc.socket_fd = -1;
             nc.is_connected = 0;
@@ -342,9 +343,10 @@ int receive_udp_packet(node_connection& nc, int& sockfd, unsigned char* key, uns
     long long temp_ts = 0;
     int type = 0;
 
+    socklen_t client_addr_len = sizeof(client_addr);
     // After select indicates sockfd is ready to read...
-    received_bytes = recv(sockfd, buffer, sizeof(buffer), MSG_DONTWAIT);
-
+    //received_bytes = recv(sockfd, buffer, sizeof(buffer), MSG_DONTWAIT);
+    received_bytes = recvfrom(nc.socket_fd, buffer, sizeof(buffer), MSG_DONTWAIT, (struct sockaddr *)&client_addr, &client_addr_len);
     if (received_bytes < 0) {
         // Check if the operation would block or if there's another error
         if (errno == EAGAIN || errno == EWOULDBLOCK) {

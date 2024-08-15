@@ -332,7 +332,7 @@ int receive_udp_packet(node_connection& nc, long long* ts, int* already_sent, lo
 
     int fields[10];
     int nb_fields = 0;
-
+    socklen_t client_addr_len = sizeof(client_addr);
     //received_bytes = recv(nc.socket_fd, buffer, sizeof(buffer), MSG_DONTWAIT);
     received_bytes = recvfrom(nc.socket_fd, buffer, sizeof(buffer), MSG_DONTWAIT, (struct sockaddr *)&client_addr, &client_addr_len);
     if (received_bytes < 0) {
