@@ -184,7 +184,41 @@ void terminate_enclave()
     printf("Host: Enclave successfully terminated.\n");
 }
 
+void set_thread_affinity(int core_id) {
+    /*
+    set the affinity of the current thread to the core_id
+    */
+    pthread_t t = pthread_self();
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(core_id, &cpuset);
 
+    int s = pthread_setaffinity_np(t, sizeof(cpu_set_t), &cpuset);
+    if (s != 0) {
+        std::cerr << "Error setting thread affinity: " << strerror(s) << std::endl;
+    }
+}
+
+void set_affinity(int core_id) {
+    /*
+    set the affinity of the current thread to the core_id
+    */
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(core_id, &cpuset);
+
+    // Get the current thread (which is the main thread in this case)
+    pid_t pid = getpid();
+    //printf("pid: %d\n", pid);
+    
+    int result = sched_setaffinity(pid, sizeof(cpu_set_t), &cpuset);
+    if (result != 0) {
+        std::cerr << "Error setting thread affinity: " << strerror(result) << std::endl;
+    } else {
+        //std::cout << "Thread affinity set to CPU " << core_id << std::endl;
+    }
+    
+}
 
 void readTSC(long long* test) {
     #if defined(_MSC_VER) // MSVC specific
@@ -203,46 +237,50 @@ int ocall_select(int nfds, fd_set* readfds, struct timeval* timeout) {
     return result;
 }
 
-void add_thread(void)
+void add_thread(int core_id_add)
 {
+    set_thread_affinity(core_id_add)
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
     ret = count_add(server_global_eid);
     if (ret != SGX_SUCCESS)
         abort();
 }
 
-void startServer_thread(int server_port, int* node_port, int client_port, int trusted_server_port)
+void startServer_thread(int server_port, int* node_port, int client_port, int trusted_server_port, int core_id_server)
 {
+    set_thread_affinity(core_id_server)
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
     ret = init_server(server_global_eid, server_port, node_port[0], node_port[1], client_port, trusted_server_port);
     if (ret != SGX_SUCCESS)
         abort();
 }
 
-void startClient_thread(int own_port, int* node_port, int client_port, int trusted_server_port)
+void startClient_thread(int own_port, int* node_port, int client_port, int trusted_server_port, int core_id_client)
 {
+    set_thread_affinity(core_id_client)
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
     init_client(server_global_eid, "127.0.0.1", own_port, node_port[0], node_port[1], client_port, trusted_server_port);
     if (ret != SGX_SUCCESS)
         abort();
 }
 
-void readTS_thread(void)
+void readTS_thread(int core_id_readTSC)
 {
+    set_thread_affinity(core_id_readTSC)
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
     ret = readTS(server_global_eid);
     if (ret != SGX_SUCCESS)
         abort();
 }
 
-void start_runtime(int own_port, int* node_port, int client_port, int trusted_server_port)
+void start_runtime(int own_port, int* node_port, int client_port, int trusted_server_port, int core_id_readTSC, int ccore_id_server, int core_id_client, int core_id_add)
 {
     printf("HOST : Starting server\n");
-    std::thread startServer(startServer_thread, own_port, node_port, client_port, trusted_server_port);
+    std::thread startServer(startServer_thread, own_port, node_port, client_port, trusted_server_port, core_id_server);
     printf("HOST : Starting client\n");
-    std::thread startClient(startClient_thread, own_port, node_port, client_port, trusted_server_port);
-    std::thread add(add_thread);
-    std::thread readTS(readTS_thread);
+    std::thread startClient(startClient_thread, own_port, node_port, client_port, trusted_server_port, core_id_client);
+    std::thread add(add_thread, core_id_add);
+    std::thread readTS(readTS_thread, core_id_readTSC);
 
     readTS.join();
     startServer.join();
@@ -265,12 +303,12 @@ int main(int argc, const char* argv[])
     int node2_port = 0;
     int keep_server_up = 0; 
 
-    if (argc == 6)
+    if (argc == 10)
     {
         if (strcmp(argv[5], LOOP_OPTION) != 0)
         {
             printf(
-                "Usage: %s TLS_SERVER_ENCLAVE_PATH <server_port> <node1_port> <node2_port> [%s]\n",
+                "Usage: %s TLS_SERVER_ENCLAVE_PATH <server_port> <node1_port> <node2_port> <core_id_readTSC><core_id_server><core_id_client><core_id_add>[%s]\n",
                 argv[0],
                 LOOP_OPTION);
             return 1;
@@ -280,7 +318,7 @@ int main(int argc, const char* argv[])
             keep_server_up = 1;
         }
     }
-    else if (argc != 5)
+    else if (argc != 9)
     {
         printf(
             "Usage: %s TLS_SERVER_ENCLAVE_PATH -port:<port> [%s]\n",
@@ -293,7 +331,15 @@ int main(int argc, const char* argv[])
     node1_port = atoi(argv[3]);
     node2_port = atoi(argv[4]);
 
+    int core_id_readTSC = atoi(argv[5]);
+    int core_id_server = atoi(argv[6]);
+    int core_id_client = atoi(argv[7]);
+    int core_id_add = atoi(argv[8]);
+
+
     int node_port[2] = {node1_port, node2_port};
+    int core_id_parent;
+    set_affinity(core_id_parent)
 
     printf("Host: Creating an tls server enclave\n");
     result = initialize_enclave(argv[1], &us_config);
@@ -302,7 +348,7 @@ int main(int argc, const char* argv[])
         goto exit;
     }
     
-    start_runtime(server_port, node_port, 12300, 12350);
+    start_runtime(server_port, node_port, 12300, 12350, core_id_readTSC, core_id_server, core_id_client, core_id_add);
     printf("result : %d, ret : %d\n", result, ret);
     if (result != SGX_SUCCESS || ret != 0)
     {
