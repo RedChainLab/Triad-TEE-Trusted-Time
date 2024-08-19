@@ -36,7 +36,7 @@ with `<sleep_time>` the number of seconds to run the test; `<sleep_inside_enclav
 
 ### Running for experiments
 
-A makefile recipe `make exp` is available that automatically outputs results in a timestamped file `aex-<timestamp>.csv` (e.g., `aex-2024-08-19-10-10-05.csv`):
+A makefile recipe `make exp` is available that automatically outputs results in a timestamped file `aex-<sleep_time_s>-<timestamp>.csv` (e.g., `aex-30-2024-08-19-10-10-05.csv`):
 ``` sh
 make exp [CORE_MAIN=2] [CORE_ADD=4] [SLEEP_IN_ENCLAVE=0] [SLEEP_TIME=10]
 ```

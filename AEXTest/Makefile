@@ -36,7 +36,7 @@ SLEEP_IN_ENCLAVE?=0
 CORE_MAIN?=2
 CORE_ADD?=4
 
-LOG_FILE?=aex-$(shell date +'%Y-%m-%d-%H-%M-%S').csv
+LOG_FILE?=aex-$(SLEEP_TIME)-$(shell date +'%Y-%m-%d-%H-%M-%S').csv
 
 ######## SGX SDK Settings ########
 
