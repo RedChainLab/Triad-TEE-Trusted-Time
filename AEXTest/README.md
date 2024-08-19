@@ -40,3 +40,16 @@ A makefile recipe `make exp` is available that automatically outputs results in 
 ``` sh
 make exp [CORE_MAIN=2] [CORE_ADD=4] [SLEEP_IN_ENCLAVE=0] [SLEEP_TIME=10]
 ```
+
+### Plotting results
+
+Python scripts are available in the `analysis` folder.
+All follow the same interface `python <script_name> <results_file_name>.csv [0|1]`, with `results_file_name` the name of a file obtained during an experiment run (e.g., with `make exp` in the previous section), and a parameter 0 or 1 if few or many AEX occured in that experiment (in order to adapt the axis ticks).
+The script `gen_plots.sh` in this same `analysis` folder enables to run all 3 scripts on all `.csv` files in the `out` folder, with the same parameter 0 or 1 as the Python scripts, i.e., by running:
+``` sh
+sh gen_plots.sh [0|1]
+```
+Available Python scripts do the following:
+- `aex_timeline.py` plots the number of AEX events over the experiment timeframe;
+- `aex_difference.py` plots the cumulative number of AEX events which occured *x* (milli)seconds after the previous one;
+- `aex_ttpAEX.py` plots for each numbered AEX event the time since the previous AEX event.
