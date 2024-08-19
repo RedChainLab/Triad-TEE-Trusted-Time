@@ -36,6 +36,8 @@ SLEEP_IN_ENCLAVE?=0
 CORE_MAIN?=2
 CORE_ADD?=4
 
+LOG_FILE?=aex-$(shell date +'%Y-%m-%d-%H-%M-%S').csv
+
 ######## SGX SDK Settings ########
 
 SGX_SDK ?= /opt/intel/sgxsdk
@@ -197,6 +199,11 @@ ifneq ($(Build_Mode), HW_RELEASE)
 	@$(CURDIR)/$(App_Name) $(SLEEP_TIME) $(SLEEP_IN_ENCLAVE) $(CORE_MAIN) $(CORE_ADD)
 	@echo "RUN  =>  $(App_Name) [$(SGX_MODE)|$(SGX_ARCH), OK]"
 endif
+
+exp: all
+	@echo $(CURDIR)/$(App_Name) $(SLEEP_TIME) $(SLEEP_IN_ENCLAVE) $(CORE_MAIN) $(CORE_ADD) > $(CURDIR)/$(LOG_FILE)
+	@$(CURDIR)/$(App_Name) $(SLEEP_TIME) $(SLEEP_IN_ENCLAVE) $(CORE_MAIN) $(CORE_ADD) > $(CURDIR)/$(LOG_FILE)
+	@echo "RUN  =>  $(App_Name) [$(SGX_MODE)|$(SGX_ARCH), OK]"
 
 ######## App Objects ########
 

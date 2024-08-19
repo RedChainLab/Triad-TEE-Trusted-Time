@@ -10,3 +10,4 @@ app
 */build/*
 tls_server_host
 ssl_client
+*.csv
