@@ -126,6 +126,26 @@ ssize_t recv(int fd, void *buf, size_t len, int flags)
     return -1;
 }
 
+ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen)
+{
+    ssize_t ret = 0;
+
+    if (u_sendto(&ret, sockfd, buf, len, flags, dest_addr, addrlen) == SGX_SUCCESS)
+        return ret;
+
+    return -1;
+}
+
+ssize_t recvfrom(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen)
+{
+    ssize_t ret = 0;
+
+    if(u_recvfrom(&ret, sockfd, buf, len, flags, dest_addr, addrlen) == SGX_SUCCESS)
+        return ret;
+
+    return -1;
+}
+
 int setsockopt(
 			int fd, 
 			int level, 
