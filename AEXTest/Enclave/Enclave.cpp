@@ -32,7 +32,7 @@
 #include <stdio.h>
 #include <sgx_trts_aex.h>
 #include <sgx_thread.h>
-#define SIZE 4096
+#define SIZE 65536
 
 long long timestamps;
 long long aex_count = 0;
@@ -136,6 +136,7 @@ void main_thread(int sleep_time, int sleep_inside_enclave){
 
     t_print("idx;count\n");
     printArray(Countadd);
+    t_print("%d;%lld\n", aex_count, count);
     //t_print("Count : %lld\n", count);
     //t_print("Number of AEX : %d\n", aex_count);
 }
