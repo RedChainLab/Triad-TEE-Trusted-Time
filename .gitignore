@@ -11,3 +11,5 @@ app
 tls_server_host
 ssl_client
 *.csv
+*.pdf
+*.png
