@@ -38,7 +38,6 @@ long long timestamps;
 long long aex_count = 0;
 long long count = 0;
 long long int Countadd[SIZE];
-long long int Countadd_intervals[SIZE];
 int index = 0;
 
 # define BUFSIZ  8192
@@ -72,7 +71,6 @@ static void my_aex_notify_handler(const sgx_exception_info_t *info, const void *
    (void)info;
    (void)args;
    Countadd[aex_count] = count;
-   Countadd_intervals[aex_count] = count - Countadd[aex_count-1];
    aex_count++;
 }
 
@@ -81,9 +79,8 @@ void printArray(long long int *arr){
     Print a array of size SIZE, which contains the number of ADD operations performed before each AEX occurs.
     */
     for(int i = 0; i < aex_count ; i++){
-        t_print("Countadd[%d] : %lld\n", i, arr[i]);
+        t_print("%d;%lld\n", i, arr[i]);
     }
-    t_print("\n\n");
 }
 
 void countADD(void){
@@ -107,7 +104,7 @@ void countADD(void){
 }
 
 
-void main_thread(int sleep_time, int core_id, int set_aff, int sleep_inside_enclave){
+void main_thread(int sleep_time, int sleep_inside_enclave){
     /*
     the main thread that will be called by the application.
     */
@@ -133,15 +130,12 @@ void main_thread(int sleep_time, int core_id, int set_aff, int sleep_inside_encl
     else
         ocall_sleep(&sleep_time);
     
-    //t_print("c->isCounting : %d\n", c->isCounting);
     sgx_thread_mutex_lock(&c->mutex);
     c->isCounting = 0;
     sgx_thread_mutex_unlock(&c->mutex);
 
-    //sgx_unregister_aex_handler(my_aex_notify_handler);  
+    t_print("idx;count\n");
     printArray(Countadd);
-    printArray(Countadd_intervals);
-    t_print("Count : %lld\n", count);
-    t_print("Number of AEX : %d\n", aex_count);
-
+    //t_print("Count : %lld\n", count);
+    //t_print("Number of AEX : %d\n", aex_count);
 }

@@ -266,19 +266,19 @@ void ocall_sleep(int* sec) {
     /*
     Sleep for sec seconds outside the enclave
     */
-    printf("Sleeping for %d seconds outside the enclave...\n", *sec);
+    //printf("Sleeping for %d seconds outside the enclave...\n", *sec);
     sleep(*sec);
-    printf("Done sleeping outside the enclave\n");
+    //printf("Done sleeping outside the enclave\n");
 }
 
-void ecall_add_thread(int set_aff)
+void ecall_add_thread(int set_aff, int core_add)
 {
     /*
     the function that enters the enclave to perform ADD operations.
     */
     if (set_aff)
     {
-        set_thread_affinity(2);
+        set_thread_affinity(core_add);
     }
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
     ret = countADD(global_eid);
@@ -286,32 +286,31 @@ void ecall_add_thread(int set_aff)
         abort();
 }
 
-void ecall_main_thread(int sleep_time, int core_id, int set_aff, int sleep_inside_enclave)
+void ecall_main_thread(int sleep_time, int sleep_inside_enclave, int set_aff, int core_main)
 {
     /*
     the function that enters the enclave to lanuch the main thread.
     */
     if (set_aff)
     {
-        set_thread_affinity(1);
+        set_thread_affinity(core_main);
     }
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
-    ret = main_thread(global_eid, sleep_time, core_id, set_aff, sleep_inside_enclave);
+    ret = main_thread(global_eid, sleep_time, sleep_inside_enclave);
     if (ret != SGX_SUCCESS)
         abort();
 }
 
-void start_threads(int sleep_time, int core_id, int set_aff, int sleep_inside_enclave)
+void start_threads(int sleep_time, int sleep_inside_enclave, int set_aff, int core_main, int core_add)
 {
     /*
     intialize the threads and start them.
     */
     //printf("Info: Starting both threads...  \n");
-    std::thread calib(ecall_main_thread, sleep_time, core_id, set_aff, sleep_inside_enclave);
-    std::thread add(ecall_add_thread, set_aff);
+    std::thread calib(ecall_main_thread, sleep_time, sleep_inside_enclave, set_aff, core_main);
+    std::thread add(ecall_add_thread, set_aff, core_add);
     calib.join();
     add.join();
-
 }
 
 
@@ -320,17 +319,33 @@ int SGX_CDECL main(int argc, char *argv[])
 {
     (void) argc;
     (void) argv;
-    if(argc < 5)
+    if(argc !=3 && argc != 5)
     {
-        //printf("Usage: %s <sleep_time> <core_id> <set_affinity><sleep_inside_enclave>\n", argv[0]);
+        printf("Usage: %s <sleep_time> <sleep_inside_enclave> [<core_main> <core_add>]\n", argv[0]);
         return -1;
     }
-        //see_pid("countADD");
-    int sleep_time = atoi(argv[1]);
-    int core_id = atoi(argv[2]);
-    int set_aff = atoi(argv[3]);
-    int sleep_inside_enclave = atoi(argv[4]);
-    //printf(" ==== Chosen configuration ====\n sleep_time: %d, core_id: %d, set_affinity: %d, sleep_inside_enclave: %d\n", sleep_time, core_id, set_aff, sleep_inside_enclave);
+    int sleep_time = 0;
+    int sleep_inside_enclave = 0;
+    int set_aff = 0;
+    int core_main = -1;
+    int core_add = -1;
+    try
+    {
+        sleep_time = atoi(argv[1]);
+        sleep_inside_enclave = atoi(argv[2]);
+        if (argc==5)
+        {
+            set_aff = 1;
+            core_main = atoi(argv[3]);
+            core_add = atoi(argv[4]);
+        }
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return -1;
+    }
+
     /* Configuration for Switchless SGX */
     sgx_uswitchless_config_t us_config = SGX_USWITCHLESS_CONFIG_INITIALIZER;
     us_config.num_uworkers = 1;
@@ -343,13 +358,12 @@ int SGX_CDECL main(int argc, char *argv[])
         return -1;
     }
 
-    if (set_aff)
+    if(set_aff)
     {
-        set_affinity(core_id);
+        set_affinity(core_main);
     }
 
-    start_threads(sleep_time, core_id, set_aff, sleep_inside_enclave);
-    //main_thread(global_eid);
+    start_threads(sleep_time, sleep_inside_enclave, set_aff, core_main, core_add);
 
     sgx_destroy_enclave(global_eid);
     return 0;

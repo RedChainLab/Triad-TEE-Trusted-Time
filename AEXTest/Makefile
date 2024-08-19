@@ -29,6 +29,13 @@
 #
 #
 
+######## AEX Test Settings ########
+
+SLEEP_TIME?=10
+SLEEP_IN_ENCLAVE?=0
+CORE_MAIN?=2
+CORE_ADD?=4
+
 ######## SGX SDK Settings ########
 
 SGX_SDK ?= /opt/intel/sgxsdk
@@ -182,9 +189,12 @@ else
 all: $(App_Name) $(Signed_Enclave_Name)
 endif
 
+build: all
+
 run: all
 ifneq ($(Build_Mode), HW_RELEASE)
-	@$(CURDIR)/$(App_Name)
+	@echo $(CURDIR)/$(App_Name) $(SLEEP_TIME) $(SLEEP_IN_ENCLAVE) $(CORE_MAIN) $(CORE_ADD)
+	@$(CURDIR)/$(App_Name) $(SLEEP_TIME) $(SLEEP_IN_ENCLAVE) $(CORE_MAIN) $(CORE_ADD)
 	@echo "RUN  =>  $(App_Name) [$(SGX_MODE)|$(SGX_ARCH), OK]"
 endif
 
