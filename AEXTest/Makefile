@@ -191,6 +191,11 @@ else
 all: $(App_Name) $(Signed_Enclave_Name)
 endif
 
+deps:
+	sudo apt-get install -y python3 python3-pip
+	sudo apt-get install -y dvipng texlive-latex-extra texlive-fonts-recommended cm-super
+	pip3 install -r requirements.txt
+
 build: all
 
 run: all
