@@ -32,7 +32,7 @@ print(df)
 
 fig, ax = plt.subplots()
 ax.step(df['count'], df.index, label='AEX', marker=None if MANY_AEX else "x", markersize=5, linewidth=1, where='post')
-ax.set_xlabel(f'Time to next AEX ({"ms" if MANY_AEX else "s"})')
+ax.set_xlabel(f'Elapsed time ({"ms" if MANY_AEX else "s"})')
 ax.set_ylabel('Number of AEX')
 
 y_closest_power_of_10 = 10 ** (math.floor(math.log10(df.index.max()))-(0 if MANY_AEX else 1))
