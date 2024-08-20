@@ -286,7 +286,7 @@ void send_udp_packet(node_connection& nc, const unsigned char* message, int mess
     int retries = 3;
     int bytes_sent = 0;
     while (retries > 0) {
-        bytes_sent = sendto(sockfd, message, message_len, MSG_NOSIGNAL, (struct sockaddr *)&server_addr, sizeof(server_addr));
+        bytes_sent = ocall_sendto(sockfd, message, message_len, MSG_NOSIGNAL, (struct sockaddr *)&server_addr, sizeof(server_addr));
         if (bytes_sent == -1) {
             nc.socket_fd = -1;
             nc.is_connected = 0;

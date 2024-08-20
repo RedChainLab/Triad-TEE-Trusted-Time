@@ -232,6 +232,16 @@ void readTSC(long long* test) {
     #endif
 }
 
+int ocall_sendto(int sockfd, const void* buf, size_t len, int flags, const struct sockaddr* dest_addr, socklen_t addrlen) {
+    int result = sendto(sockfd, buf, len, flags, dest_addr, addrlen);
+    return result;
+}
+
+int ocall_recvfrom(int sockfd, void* buf, size_t len, int flags, struct sockaddr* src_addr, socklen_t* addrlen) {
+    int result = recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+    return result;
+}
+
 int ocall_select(int nfds, fd_set* readfds, struct timeval* timeout) {
     int result = select(nfds, readfds, NULL, NULL, timeout);
     return result;
