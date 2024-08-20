@@ -56,8 +56,8 @@ enclave {
         void readTSC([in, out] long long* test) transition_using_threads;
         int ocall_select(int nfds, [in, out] fd_set* readfds, [in, out] struct timeval* timeout);
         
-        int ocall_sendto(int sockfd, [in, out] const void* buf, size_t len, int flags, [in, out] const struct sockaddr* dest_addr, socklen_t addrlen);
-        int ocall_recvfrom(int sockfd, [in, out] void* buf, size_t len, int flags, [in, out] struct sockaddr* src_addr, [in, out ] socklen_t* addrlen);
+        ssize_t ocall_sendto (int sockfd, [in, size=len] const void* buf, size_t len, int flags, [in, size=addr_len] const struct sockaddr *dest_addr, socklen_t addr_len);
+        ssize_t ocall_recvfrom(int sockfd, [out, size=len] void* buf, size_t len, int flags,  [out, size=addr_len] struct sockaddr *src_addr, socklen_t addr_len);
     };
 };
 

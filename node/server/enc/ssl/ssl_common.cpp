@@ -284,9 +284,9 @@ void send_udp_packet(node_connection& nc, const unsigned char* message, int mess
 
     server_addr.sin_addr.s_addr = inet_addr2(server_ip);
     int retries = 3;
-    int bytes_sent = 0;
+    ssize_t bytes_sent = 0;
     while (retries > 0) {
-        bytes_sent = ocall_sendto(sockfd, message, message_len, MSG_NOSIGNAL, (struct sockaddr *)&server_addr, sizeof(server_addr));
+        int s = ocall_sendto(&bytes_sent, sockfd, message, message_len, MSG_NOSIGNAL, (struct sockaddr *)&server_addr, sizeof(server_addr));
         if (bytes_sent == -1) {
             nc.socket_fd = -1;
             nc.is_connected = 0;
@@ -334,7 +334,7 @@ int receive_udp_packet(node_connection& nc, long long* ts, int* already_sent, lo
     int nb_fields = 0;
     socklen_t client_addr_len = sizeof(client_addr);
     //received_bytes = recv(nc.socket_fd, buffer, sizeof(buffer), MSG_DONTWAIT);
-    received_bytes = ocall_recvfrom(nc.socket_fd, buffer, sizeof(buffer), MSG_DONTWAIT, (struct sockaddr *)&client_addr, &client_addr_len);
+    int s = ocall_recvfrom(&received_bytes, nc.socket_fd, buffer, sizeof(buffer), MSG_DONTWAIT, (struct sockaddr *)&client_addr, client_addr_len);
     if (received_bytes < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
             t_print("No data available to read, operation would block.\n");
