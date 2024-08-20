@@ -49,4 +49,3 @@ enclave {
         int u_close(int fd);
     };
 };
-
