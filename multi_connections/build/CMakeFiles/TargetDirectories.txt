@@ -1,3 +1,0 @@
-/home/jean/SGX/triad/triad2/multi_connections3/build/CMakeFiles/MultiNodeTLS.dir
-/home/jean/SGX/triad/triad2/multi_connections3/build/CMakeFiles/edit_cache.dir
-/home/jean/SGX/triad/triad2/multi_connections3/build/CMakeFiles/rebuild_cache.dir
