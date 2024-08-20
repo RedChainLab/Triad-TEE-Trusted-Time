@@ -126,7 +126,7 @@ ssize_t recv(int fd, void *buf, size_t len, int flags)
     return -1;
 }
 
-ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen)
+/*ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen)
 {
     ssize_t ret = 0;
 
@@ -144,7 +144,7 @@ ssize_t recvfrom(int sockfd, const void *buf, size_t len, int flags, const struc
         return ret;
 
     return -1;
-}
+}*/
 
 int setsockopt(
 			int fd, 

@@ -213,7 +213,7 @@ void set_affinity(int core_id) {
     
     int result = sched_setaffinity(pid, sizeof(cpu_set_t), &cpuset);
     if (result != 0) {
-        std::cerr << "Error setting thread affinity: " << strerror(result) << std::endl;
+        std::cerr << "Error setting process affinity: " << strerror(result) << std::endl;
     } else {
         //std::cout << "Thread affinity set to CPU " << core_id << std::endl;
     }
@@ -239,7 +239,10 @@ int ocall_select(int nfds, fd_set* readfds, struct timeval* timeout) {
 
 void add_thread(int core_id_add)
 {
-    set_thread_affinity(core_id_add)
+    if (core_id_add >= 0)
+    {
+        set_thread_affinity(core_id_add);
+    }
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
     ret = count_add(server_global_eid);
     if (ret != SGX_SUCCESS)
@@ -248,7 +251,10 @@ void add_thread(int core_id_add)
 
 void startServer_thread(int server_port, int* node_port, int client_port, int trusted_server_port, int core_id_server)
 {
-    set_thread_affinity(core_id_server)
+    if (core_id_server >= 0)
+    {
+        set_thread_affinity(core_id_server);
+    }
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
     ret = init_server(server_global_eid, server_port, node_port[0], node_port[1], client_port, trusted_server_port);
     if (ret != SGX_SUCCESS)
@@ -257,7 +263,10 @@ void startServer_thread(int server_port, int* node_port, int client_port, int tr
 
 void startClient_thread(int own_port, int* node_port, int client_port, int trusted_server_port, int core_id_client)
 {
-    set_thread_affinity(core_id_client)
+    if (core_id_client >= 0)
+    {
+        set_thread_affinity(core_id_client);
+    }
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
     init_client(server_global_eid, "127.0.0.1", own_port, node_port[0], node_port[1], client_port, trusted_server_port);
     if (ret != SGX_SUCCESS)
@@ -266,14 +275,17 @@ void startClient_thread(int own_port, int* node_port, int client_port, int trust
 
 void readTS_thread(int core_id_readTSC)
 {
-    set_thread_affinity(core_id_readTSC)
+    if (core_id_readTSC >= 0)
+    {
+        set_thread_affinity(core_id_readTSC);
+    }
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
     ret = readTS(server_global_eid);
     if (ret != SGX_SUCCESS)
         abort();
 }
 
-void start_runtime(int own_port, int* node_port, int client_port, int trusted_server_port, int core_id_readTSC, int ccore_id_server, int core_id_client, int core_id_add)
+void start_runtime(int own_port, int* node_port, int client_port, int trusted_server_port, int core_id_readTSC, int core_id_server, int core_id_client, int core_id_add)
 {
     printf("HOST : Starting server\n");
     std::thread startServer(startServer_thread, own_port, node_port, client_port, trusted_server_port, core_id_server);
@@ -298,32 +310,22 @@ int main(int argc, const char* argv[])
     sgx_status_t result = SGX_SUCCESS;
     sgx_status_t status = SGX_SUCCESS;
     int ret = 0;
+
     int server_port = 0;
     int node1_port = 0;
     int node2_port = 0;
-    int keep_server_up = 0; 
+    const int CLIENT_PORT=12300;
+    const int AUTHORITY_PORT=12350;
 
-    if (argc == 10)
+    int core_id_readTSC = -1;
+    int core_id_add = -1;
+    int core_id_server = -1;
+    int core_id_client = -1;
+    int core_id_parent= -1;
+
+    if (argc != 5 && argc != 10)
     {
-        if (strcmp(argv[5], LOOP_OPTION) != 0)
-        {
-            printf(
-                "Usage: %s TLS_SERVER_ENCLAVE_PATH <server_port> <node1_port> <node2_port> <core_id_readTSC><core_id_server><core_id_client><core_id_add>[%s]\n",
-                argv[0],
-                LOOP_OPTION);
-            return 1;
-        }
-        else
-        {
-            keep_server_up = 1;
-        }
-    }
-    else if (argc != 9)
-    {
-        printf(
-            "Usage: %s TLS_SERVER_ENCLAVE_PATH -port:<port> [%s]\n",
-            argv[0],
-            LOOP_OPTION);
+        printf("Usage: %s <enclave_path> <server_port> <node1_port> <node2_port> [<core_id_readTSC> <core_id_add> <core_id_server> <core_id_client> <core_id_parent>]\n", argv[0]);
         return 1;
     }
 
@@ -331,15 +333,17 @@ int main(int argc, const char* argv[])
     node1_port = atoi(argv[3]);
     node2_port = atoi(argv[4]);
 
-    int core_id_readTSC = atoi(argv[5]);
-    int core_id_server = atoi(argv[6]);
-    int core_id_client = atoi(argv[7]);
-    int core_id_add = atoi(argv[8]);
-
+    if (argc == 10)
+    {
+        core_id_readTSC = atoi(argv[5]);
+        core_id_add = atoi(argv[6]);
+        core_id_server = atoi(argv[7]);
+        core_id_client = atoi(argv[8]);
+        core_id_parent = atoi(argv[9]);
+        set_affinity(core_id_parent);
+    }
 
     int node_port[2] = {node1_port, node2_port};
-    int core_id_parent;
-    set_affinity(core_id_parent)
 
     printf("Host: Creating an tls server enclave\n");
     result = initialize_enclave(argv[1], &us_config);
@@ -348,7 +352,7 @@ int main(int argc, const char* argv[])
         goto exit;
     }
     
-    start_runtime(server_port, node_port, 12300, 12350, core_id_readTSC, core_id_server, core_id_client, core_id_add);
+    start_runtime(server_port, node_port, CLIENT_PORT, AUTHORITY_PORT, core_id_readTSC, core_id_server, core_id_client, core_id_add);
     printf("result : %d, ret : %d\n", result, ret);
     if (result != SGX_SUCCESS || ret != 0)
     {
@@ -357,7 +361,6 @@ int main(int argc, const char* argv[])
     }
 
 exit:
-
     printf("Host: Terminating enclaves\n");
     terminate_enclave();
 

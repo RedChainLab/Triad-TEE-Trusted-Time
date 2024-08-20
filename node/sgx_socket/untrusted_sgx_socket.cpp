@@ -87,7 +87,7 @@ ssize_t u_recv(int sockfd, void *buf, size_t nbytes, int flags)
     return recv(sockfd, buf, nbytes, flags);
 }
 
-ssize_t u_sendto(
+/*ssize_t u_sendto(
             int sockfd, 
             const void *buf, 
             size_t len, 
@@ -109,7 +109,7 @@ ssize_t u_recvfrom(
             )
 {
     return recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
-}
+}*/
 
 int u_setsockopt(
 			int sockfd, 
