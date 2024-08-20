@@ -36,7 +36,7 @@
 #include <stdlib.h>
 #include <threads.h>
 #include <unistd.h>
-
+#include <cassert>
 
 #define F_DUPFD		0	/* Duplicate file descriptor.  */
 #define F_GETFD		1	/* Get file descriptor flags.  */
@@ -184,14 +184,17 @@ void terminate_enclave()
     printf("Host: Enclave successfully terminated.\n");
 }
 
-void set_thread_affinity(int core_id) {
+void set_thread_affinity(int core_id_min, int core_id_max) {
     /*
     set the affinity of the current thread to the core_id
     */
+    assert(core_id_min <= core_id_max);
     pthread_t t = pthread_self();
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
-    CPU_SET(core_id, &cpuset);
+    for (int i = core_id_min; i <= core_id_max; i++) {
+        CPU_SET(i, &cpuset);
+    }
 
     int s = pthread_setaffinity_np(t, sizeof(cpu_set_t), &cpuset);
     if (s != 0) {
@@ -199,13 +202,16 @@ void set_thread_affinity(int core_id) {
     }
 }
 
-void set_affinity(int core_id) {
+void set_affinity(int core_id_min, int core_id_max) {
     /*
     set the affinity of the current thread to the core_id
     */
+    assert(core_id_min <= core_id_max);
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
-    CPU_SET(core_id, &cpuset);
+    for (int i = core_id_min; i <= core_id_max; i++) {
+        CPU_SET(i, &cpuset);
+    }
 
     // Get the current thread (which is the main thread in this case)
     pid_t pid = getpid();
@@ -241,7 +247,7 @@ void add_thread(int core_id_add)
 {
     if (core_id_add >= 0)
     {
-        set_thread_affinity(core_id_add);
+        set_thread_affinity(core_id_add, core_id_add);
     }
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
     ret = count_add(server_global_eid);
@@ -249,11 +255,11 @@ void add_thread(int core_id_add)
         abort();
 }
 
-void startServer_thread(int server_port, int* node_port, int client_port, int trusted_server_port, int core_id_server)
+void startServer_thread(int server_port, int* node_port, int client_port, int trusted_server_port, int core_id_min_ut, int core_id_max_ut)
 {
-    if (core_id_server >= 0)
+    if (core_id_min_ut >= 0 && core_id_max_ut >= 0)
     {
-        set_thread_affinity(core_id_server);
+        set_thread_affinity(core_id_min_ut, core_id_max_ut);
     }
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
     ret = init_server(server_global_eid, server_port, node_port[0], node_port[1], client_port, trusted_server_port);
@@ -261,11 +267,11 @@ void startServer_thread(int server_port, int* node_port, int client_port, int tr
         abort();
 }
 
-void startClient_thread(int own_port, int* node_port, int client_port, int trusted_server_port, int core_id_client)
+void startClient_thread(int own_port, int* node_port, int client_port, int trusted_server_port, int core_id_min_ut, int core_id_max_ut)
 {
-    if (core_id_client >= 0)
+    if (core_id_min_ut >= 0 && core_id_max_ut >= 0)
     {
-        set_thread_affinity(core_id_client);
+        set_thread_affinity(core_id_min_ut, core_id_max_ut);
     }
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
     init_client(server_global_eid, "127.0.0.1", own_port, node_port[0], node_port[1], client_port, trusted_server_port);
@@ -277,7 +283,7 @@ void readTS_thread(int core_id_readTSC)
 {
     if (core_id_readTSC >= 0)
     {
-        set_thread_affinity(core_id_readTSC);
+        set_thread_affinity(core_id_readTSC, core_id_readTSC);
     }
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
     ret = readTS(server_global_eid);
@@ -285,12 +291,12 @@ void readTS_thread(int core_id_readTSC)
         abort();
 }
 
-void start_runtime(int own_port, int* node_port, int client_port, int trusted_server_port, int core_id_readTSC, int core_id_server, int core_id_client, int core_id_add)
+void start_runtime(int own_port, int* node_port, int client_port, int trusted_server_port, int core_id_readTSC, int core_id_add, int core_id_min_ut, int core_id_max_ut)
 {
     printf("HOST : Starting server\n");
-    std::thread startServer(startServer_thread, own_port, node_port, client_port, trusted_server_port, core_id_server);
+    std::thread startServer(startServer_thread, own_port, node_port, client_port, trusted_server_port, core_id_min_ut, core_id_max_ut);
     printf("HOST : Starting client\n");
-    std::thread startClient(startClient_thread, own_port, node_port, client_port, trusted_server_port, core_id_client);
+    std::thread startClient(startClient_thread, own_port, node_port, client_port, trusted_server_port, core_id_min_ut, core_id_max_ut);
     std::thread add(add_thread, core_id_add);
     std::thread readTS(readTS_thread, core_id_readTSC);
 
@@ -319,13 +325,12 @@ int main(int argc, const char* argv[])
 
     int core_id_readTSC = -1;
     int core_id_add = -1;
-    int core_id_server = -1;
-    int core_id_client = -1;
-    int core_id_parent= -1;
+    int core_id_min_ut = -1;
+    int core_id_max_ut = -1;
 
-    if (argc != 5 && argc != 10)
+    if (argc != 5 && argc != 9)
     {
-        printf("Usage: %s <enclave_path> <server_port> <node1_port> <node2_port> [<core_id_readTSC> <core_id_add> <core_id_server> <core_id_client> <core_id_parent>]\n", argv[0]);
+        printf("Usage: %s <enclave_path> <server_port> <node1_port> <node2_port> [<core_id_readTSC> <core_id_add> <core_id_min_ut> <core_id_max_ut>]\n", argv[0]);
         return 1;
     }
 
@@ -333,14 +338,14 @@ int main(int argc, const char* argv[])
     node1_port = atoi(argv[3]);
     node2_port = atoi(argv[4]);
 
-    if (argc == 10)
+    if (argc == 9)
     {
         core_id_readTSC = atoi(argv[5]);
         core_id_add = atoi(argv[6]);
-        core_id_server = atoi(argv[7]);
-        core_id_client = atoi(argv[8]);
-        core_id_parent = atoi(argv[9]);
-        set_affinity(core_id_parent);
+        core_id_min_ut = atoi(argv[7]);
+        core_id_max_ut = atoi(argv[8]);
+        assert(core_id_min_ut <= core_id_max_ut);
+        set_affinity(core_id_min_ut,core_id_max_ut);
     }
 
     int node_port[2] = {node1_port, node2_port};
@@ -352,7 +357,7 @@ int main(int argc, const char* argv[])
         goto exit;
     }
     
-    start_runtime(server_port, node_port, CLIENT_PORT, AUTHORITY_PORT, core_id_readTSC, core_id_server, core_id_client, core_id_add);
+    start_runtime(server_port, node_port, CLIENT_PORT, AUTHORITY_PORT, core_id_readTSC, core_id_add, core_id_min_ut, core_id_max_ut);
     printf("result : %d, ret : %d\n", result, ret);
     if (result != SGX_SUCCESS || ret != 0)
     {
