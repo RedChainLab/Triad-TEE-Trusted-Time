@@ -267,7 +267,7 @@ void ocall_sleep(int* sec) {
     Sleep for sec seconds outside the enclave
     */
     //printf("Sleeping for %d seconds outside the enclave...\n", *sec);
-    sleep(*sec);
+    usleep(*sec);
     //printf("Done sleeping outside the enclave\n");
 }
 
