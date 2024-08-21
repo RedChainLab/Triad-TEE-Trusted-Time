@@ -19,25 +19,29 @@ sleep_time_secs = sys.argv[2]
 # Get all files in out/count directory that match in_enclave and sleep_time_secs
 import os
 import re
+import progressbar
 files = os.listdir('out/count')
 files = [f for f in files if re.match(f'count-.*-{in_enclave}-{sleep_time_secs}-.*', f)]
-print(files)
+#print(files)
 
 # Group files by timestamp
 timestamps = set(["-".join(f.split('-')[1:6]) for f in files])
-print(timestamps)
+#print(timestamps)
 
 # For each timestamp, plot the count distribution
 for timestamp in timestamps:
     files_timestamp = [f for f in files if timestamp=="-".join(f.split('-')[1:6])]
-    print(files_timestamp)
+    #print(files_timestamp)
     agg_df = pd.DataFrame()
-    for f in files_timestamp:
+    for f in progressbar.progressbar(files_timestamp):
+      try:
         with open(f'out/count/{f}', 'r') as file:
             df = pd.read_csv(file, sep=';', header=0, index_col=0)
-            print(df)
+            #print(df)
             agg_df = pd.concat([agg_df, df.tail(1)])
-    print(agg_df)
+      except Exception as e:
+        print(f'Error reading {f}: {e}\n')
+    #print(agg_df)
     fig, ax = plt.subplots()
     ax.hist(agg_df['count'], bins=50, label='AEX', histtype='step', linewidth=1)
     ax.hist(agg_df['count'], bins=50, label='AEX', histtype='step', linewidth=1, cumulative=True)
