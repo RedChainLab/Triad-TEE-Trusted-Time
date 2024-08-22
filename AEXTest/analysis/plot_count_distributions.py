@@ -33,6 +33,7 @@ for timestamp in timestamps:
     files_timestamp = [f for f in files if timestamp=="-".join(f.split('-')[1:7])]
     #print(files_timestamp)
     agg_df = pd.DataFrame()
+    print(f'Processing {timestamp}...')
     for f in progressbar.progressbar(files_timestamp):
       try:
         with open(f'out/count/{f}', 'r') as file:
@@ -41,7 +42,7 @@ for timestamp in timestamps:
             agg_df = pd.concat([agg_df, df.tail(1)])
       except Exception as e:
         print(f'Error reading {f}: {e}\n')
-    #print(agg_df)
+    agg_df.columns = ['count']
     fig, ax = plt.subplots()
     ax.hist(agg_df['count'], bins=50, label='AEX', histtype='step', linewidth=1)
     ax.hist(agg_df['count'], bins=50, label='AEX', histtype='step', linewidth=1, cumulative=True)

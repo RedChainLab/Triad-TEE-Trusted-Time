@@ -34,11 +34,13 @@
 #include <sgx_thread.h>
 #define SIZE 65536
 
-long long timestamps;
-long long aex_count = 0;
-long long count = 0;
-long long int Countadd[SIZE];
-int index = 0;
+long long int add_count = 0;
+
+long long int aex_count = 0;
+long long int monitor_aex_count = 0;
+
+long long int count_aex[SIZE];
+long long int monitor_aex[SIZE];
 
 # define BUFSIZ  8192
 
@@ -62,7 +64,7 @@ void t_print(const char *fmt, ...)
     ocall_print_string(buf);
 }
 
-static void my_aex_notify_handler(const sgx_exception_info_t *info, const void * args)
+static void counter_aex_handler(const sgx_exception_info_t *info, const void * args)
 {
     /*
     a custom handler that will be called when an AEX occurs, storing the number of ADD operations (performed in another thread) in a global array. This allows you to 
@@ -70,15 +72,27 @@ static void my_aex_notify_handler(const sgx_exception_info_t *info, const void *
     */
    (void)info;
    (void)args;
-   Countadd[aex_count] = count;
+   count_aex[aex_count] = add_count;
    aex_count++;
 }
 
-void printArray(long long int *arr){
+static void monitor_aex_handler(const sgx_exception_info_t *info, const void * args)
+{
+    /*
+    a custom handler that will be called when an AEX occurs, storing the number of ADD operations (performed in another thread) in a global array. This allows you to 
+    know when AEX occurs (the number of ADD operations increases linearly) and how often it occurs.
+    */
+   (void)info;
+   (void)args;
+   monitor_aex[monitor_aex_count] = add_count;
+   monitor_aex_count++;
+}
+
+void printArray(long long int *arr, long long int size){
     /*
     Print a array of size SIZE, which contains the number of ADD operations performed before each AEX occurs.
     */
-    for(int i = 0; i < aex_count ; i++){
+    for(int i = 0; i < size ; i++){
         t_print("%d;%lld\n", i, arr[i]);
     }
 }
@@ -90,7 +104,7 @@ void countADD(void){
     //see_pid("countADD");
     const char* args = NULL; 
     sgx_aex_mitigation_node_t node;
-    sgx_register_aex_handler(&node, my_aex_notify_handler, (const void*)args);
+    sgx_register_aex_handler(&node, counter_aex_handler, (const void*)args);
     cond_struct_t *c = &cond;
     sgx_thread_mutex_lock(&c->mutex);
     while (!c->isCounting) {
@@ -98,9 +112,9 @@ void countADD(void){
     }
     sgx_thread_mutex_unlock(&c->mutex);
     while(c->isCounting == 1){
-        count++; 
+        add_count++; 
     }
-    sgx_unregister_aex_handler(my_aex_notify_handler);
+    sgx_unregister_aex_handler(counter_aex_handler);
 }
 
 
@@ -110,22 +124,18 @@ void main_thread(int sleep_time, int sleep_inside_enclave){
     */
     //see_pid("main_thread");
     cond_struct_t *c = &cond;
-    /*    
+    
     const char* args = NULL; 
     sgx_aex_mitigation_node_t node;
-    sgx_register_aex_handler(&node, my_aex_notify_handler, (const void*)args);
-    */
+    sgx_register_aex_handler(&node, monitor_aex_handler, (const void*)args);
+    
     sgx_thread_mutex_lock(&c->mutex);
     c->isCounting = 1;
     sgx_thread_cond_signal(&c->startCounting);
     sgx_thread_mutex_unlock(&c->mutex);
 
     if(sleep_inside_enclave){
-        for (int j = 0; j < 75*sleep_time; j++){
-            for(int i = 0; i < 10000000; i++){
-                
-            }
-        }
+        for (int j = 0; j < 375000*sleep_time; j++);
     }
     else
         ocall_sleep(&sleep_time);
@@ -134,9 +144,14 @@ void main_thread(int sleep_time, int sleep_inside_enclave){
     c->isCounting = 0;
     sgx_thread_mutex_unlock(&c->mutex);
 
+    sgx_unregister_aex_handler(monitor_aex_handler);
+
     t_print("idx;count\n");
-    printArray(Countadd);
-    t_print("%d;%lld\n", aex_count, count);
-    //t_print("Count : %lld\n", count);
+    printArray(count_aex, aex_count);
+    //t_print("idx;monitor_aex_count\n");
+    //printArray(monitor_aex, monitor_aex_count);
+    //t_print("counter_aex_count;monitor_aex_count;final_count\n");
+    t_print("%lld;%lld\n", aex_count, add_count);
+    //t_print("add_count : %lld\n", add_count);
     //t_print("Number of AEX : %d\n", aex_count);
 }

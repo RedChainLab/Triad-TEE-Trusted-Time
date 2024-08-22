@@ -267,7 +267,7 @@ void ocall_sleep(int* sec) {
     Sleep for sec seconds outside the enclave
     */
     //printf("Sleeping for %d seconds outside the enclave...\n", *sec);
-    usleep(*sec);
+    usleep(1000*(*sec));
     //printf("Done sleeping outside the enclave\n");
 }
 
@@ -360,7 +360,7 @@ int SGX_CDECL main(int argc, char *argv[])
 
     if(set_aff)
     {
-        set_affinity(core_main);
+        //set_affinity(core_parent);
     }
 
     start_threads(sleep_time, sleep_inside_enclave, set_aff, core_main, core_add);
