@@ -25,12 +25,12 @@ files = [f for f in files if re.match(f'count-.*-{in_enclave}-{sleep_time_secs}-
 #print(files)
 
 # Group files by timestamp
-timestamps = set(["-".join(f.split('-')[1:6]) for f in files])
+timestamps = set(["-".join(f.split('-')[1:7]) for f in files])
 #print(timestamps)
 
 # For each timestamp, plot the count distribution
 for timestamp in timestamps:
-    files_timestamp = [f for f in files if timestamp=="-".join(f.split('-')[1:6])]
+    files_timestamp = [f for f in files if timestamp=="-".join(f.split('-')[1:7])]
     #print(files_timestamp)
     agg_df = pd.DataFrame()
     for f in progressbar.progressbar(files_timestamp):
