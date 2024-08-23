@@ -88,7 +88,7 @@ static void monitor_aex_handler(const sgx_exception_info_t *info, const void * a
    monitor_aex_count++;
 }
 
-void printArray(long long int *arr, long long int size){
+void printArray(long long int *arr, long long int size, long long int offset=0){
     /*
     Print a array of size SIZE, which contains the number of ADD operations performed before each AEX occurs.
     */
@@ -105,15 +105,11 @@ void countADD(void){
     const char* args = NULL; 
     sgx_aex_mitigation_node_t node;
     sgx_register_aex_handler(&node, counter_aex_handler, (const void*)args);
-    cond_struct_t *c = &cond;
-    sgx_thread_mutex_lock(&c->mutex);
-    while (!c->isCounting) {
-        sgx_thread_cond_wait(&c->startCounting, &c->mutex);
-    }
-    sgx_thread_mutex_unlock(&c->mutex);
-    while(c->isCounting == 1){
-        add_count++; 
-    }
+    __asm__ volatile("mov %0, %%rcx" : : "r"(&add_count));
+    __asm__ volatile("1: inc %rax");
+    __asm__ volatile("mov %rax, (%rcx)");
+    __asm__ volatile("test %rax, %rax");
+    __asm__ volatile("jz 1b");
     sgx_unregister_aex_handler(counter_aex_handler);
 }
 
@@ -122,36 +118,35 @@ void main_thread(int sleep_time, int sleep_inside_enclave){
     /*
     the main thread that will be called by the application.
     */
-    //see_pid("main_thread");
-    cond_struct_t *c = &cond;
-    
+    long long int mem_count_start = 0;
+    long long int mem_count_end = 0;
+
     const char* args = NULL; 
     sgx_aex_mitigation_node_t node;
     sgx_register_aex_handler(&node, monitor_aex_handler, (const void*)args);
-    
-    sgx_thread_mutex_lock(&c->mutex);
-    c->isCounting = 1;
-    sgx_thread_cond_signal(&c->startCounting);
-    sgx_thread_mutex_unlock(&c->mutex);
-
+    long long int sleep_cycles = -sleep_time;
     if(sleep_inside_enclave){
-        for (int j = 0; j < 375000*sleep_time; j++);
+        while(!add_count);
+        mem_count_start = add_count;
+        __asm__ volatile("mov %0, %%rax" : : "r"(sleep_cycles));
+        __asm__ volatile("1: inc %rax\n"
+                        "test %rax, %rax\n"
+                        "jz 1b");
+        mem_count_end = add_count;
     }
     else
+        mem_count_start = add_count;
         ocall_sleep(&sleep_time);
-    
-    sgx_thread_mutex_lock(&c->mutex);
-    c->isCounting = 0;
-    sgx_thread_mutex_unlock(&c->mutex);
-
+        mem_count_end = add_count;
     sgx_unregister_aex_handler(monitor_aex_handler);
 
     t_print("idx;count\n");
-    printArray(count_aex, aex_count);
+    printArray(count_aex, aex_count, mem_count_start);
     //t_print("idx;monitor_aex_count\n");
-    //printArray(monitor_aex, monitor_aex_count);
+    //printArray(monitor_aex, monitor_aex_count, mem_count_start);
     //t_print("counter_aex_count;monitor_aex_count;final_count\n");
-    t_print("%lld;%lld\n", aex_count, add_count);
+    //t_print("%lld;%lld;%lld\n", aex_count, monitor_aex_count, mem_count_end-mem_count_start);
+    t_print("%lld;%lld\n", aex_count, mem_count_end-mem_count_start);
     //t_print("add_count : %lld\n", add_count);
     //t_print("Number of AEX : %d\n", aex_count);
 }
