@@ -70,10 +70,10 @@ static void counter_aex_handler(const sgx_exception_info_t *info, const void * a
     a custom handler that will be called when an AEX occurs, storing the number of ADD operations (performed in another thread) in a global array. This allows you to 
     know when AEX occurs (the number of ADD operations increases linearly) and how often it occurs.
     */
-   (void)info;
-   (void)args;
-   count_aex[aex_count] = add_count;
-   aex_count++;
+    (void)info;
+    (void)args;
+    count_aex[aex_count] = add_count;
+    aex_count++;
 }
 
 static void monitor_aex_handler(const sgx_exception_info_t *info, const void * args)
@@ -82,10 +82,10 @@ static void monitor_aex_handler(const sgx_exception_info_t *info, const void * a
     a custom handler that will be called when an AEX occurs, storing the number of ADD operations (performed in another thread) in a global array. This allows you to 
     know when AEX occurs (the number of ADD operations increases linearly) and how often it occurs.
     */
-   (void)info;
-   (void)args;
-   monitor_aex[monitor_aex_count] = add_count;
-   monitor_aex_count++;
+    (void)info;
+    (void)args;
+    monitor_aex[monitor_aex_count] = add_count;
+    monitor_aex_count++;
 }
 
 void printArray(long long int *arr, long long int size){
@@ -135,7 +135,7 @@ void main_thread(int sleep_time, int sleep_inside_enclave){
     sgx_thread_mutex_unlock(&c->mutex);
 
     if(sleep_inside_enclave){
-        for (int j = 0; j < 375000*sleep_time; j++);
+        for (int j = 0; j < 360000*sleep_time; j++);
     }
     else
         ocall_sleep(&sleep_time);
@@ -150,8 +150,9 @@ void main_thread(int sleep_time, int sleep_inside_enclave){
     printArray(count_aex, aex_count);
     //t_print("idx;monitor_aex_count\n");
     //printArray(monitor_aex, monitor_aex_count);
-    //t_print("counter_aex_count;monitor_aex_count;final_count\n");
     t_print("%lld;%lld\n", aex_count, add_count);
+    //t_print("counter_aex_count;monitor_aex_count;final_count\n");
+    //t_print("%lld;%lld;%lld\n", aex_count, monitor_aex_count, add_count);
     //t_print("add_count : %lld\n", add_count);
     //t_print("Number of AEX : %d\n", aex_count);
 }

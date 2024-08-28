@@ -321,7 +321,7 @@ int SGX_CDECL main(int argc, char *argv[])
     (void) argv;
     if(argc !=3 && argc != 5)
     {
-        printf("Usage: %s <sleep_time> <sleep_inside_enclave> [<core_main> <core_add>]\n", argv[0]);
+        printf("Usage: %s <sleep_time> <sleep_inside_enclave> [<core_add> <core_main>]\n", argv[0]);
         return -1;
     }
     int sleep_time = 0;
@@ -336,8 +336,8 @@ int SGX_CDECL main(int argc, char *argv[])
         if (argc==5)
         {
             set_aff = 1;
-            core_main = atoi(argv[3]);
-            core_add = atoi(argv[4]);
+            core_add = atoi(argv[3]);
+            core_main = atoi(argv[4]);
         }
     }
     catch (const std::exception& e)
