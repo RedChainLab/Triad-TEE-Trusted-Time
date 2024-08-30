@@ -23,7 +23,7 @@ do
     for i in $(seq 1 $repeats)
     do
         echo "> ${sleep_time}ms sleep time, repetition $i"
-        ./app $sleep_time $1 2 4 > $filepath_prefix-$1-$sleep_time-$i.csv
+        ./app $sleep_time $1 1 2 > $filepath_prefix-$1-$sleep_time-$i.csv
     done
     echo "Finished generating $filepath_prefix-$1-$sleep_time-*.csv"
 done

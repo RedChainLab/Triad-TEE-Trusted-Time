@@ -202,7 +202,7 @@ void ocall_print_string(const char *str)
 }
 
 
-void readTSC(long long* ts) {
+void ocall_readTSC(long long* ts) {
     /*
     Read the TSC register
     */
@@ -267,7 +267,7 @@ void ocall_sleep(int* sec) {
     Sleep for sec seconds outside the enclave
     */
     //printf("Sleeping for %d seconds outside the enclave...\n", *sec);
-    usleep(1000*(*sec));
+    sleep(*sec);
     //printf("Done sleeping outside the enclave\n");
 }
 

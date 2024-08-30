@@ -35,6 +35,7 @@
 #define SIZE 65536
 
 long long int add_count = 0;
+long long int tsc = 0;
 
 long long int aex_count = 0;
 long long int monitor_aex_count = 0;
@@ -134,11 +135,27 @@ void main_thread(int sleep_time, int sleep_inside_enclave){
     sgx_thread_cond_signal(&c->startCounting);
     sgx_thread_mutex_unlock(&c->mutex);
 
-    if(sleep_inside_enclave){
-        for (int j = 0; j < 360000*sleep_time; j++);
-    }
-    else
+    switch(sleep_inside_enclave){
+        case 1:
+        {
+            long long int timestamp_start = -1;
+            ocall_readTSC(&timestamp_start);
+            while(tsc-timestamp_start < 3000000000*sleep_time){
+                ocall_readTSC(&tsc);
+            }
+        }
+        break;
+        case 0:
         ocall_sleep(&sleep_time);
+        break;
+        case 2:
+        {
+            long long int counter = 0;
+            while(counter < 720000000*sleep_time){
+                counter++;
+            }
+        }
+    }
     
     sgx_thread_mutex_lock(&c->mutex);
     c->isCounting = 0;
@@ -148,11 +165,11 @@ void main_thread(int sleep_time, int sleep_inside_enclave){
 
     t_print("idx;count\n");
     printArray(count_aex, aex_count);
-    //t_print("idx;monitor_aex_count\n");
-    //printArray(monitor_aex, monitor_aex_count);
-    t_print("%lld;%lld\n", aex_count, add_count);
-    //t_print("counter_aex_count;monitor_aex_count;final_count\n");
-    //t_print("%lld;%lld;%lld\n", aex_count, monitor_aex_count, add_count);
+    t_print("idx;monitor_aex_count\n");
+    printArray(monitor_aex, monitor_aex_count);
+    //t_print("%lld;%lld\n", aex_count, add_count);
+    t_print("counter_aex_count;monitor_aex_count;final_count\n");
+    t_print("%lld;%lld;%lld\n", aex_count, monitor_aex_count, add_count);
     //t_print("add_count : %lld\n", add_count);
     //t_print("Number of AEX : %d\n", aex_count);
 }
