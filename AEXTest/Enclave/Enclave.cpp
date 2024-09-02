@@ -136,6 +136,9 @@ void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity){
     sgx_thread_mutex_unlock(&c->mutex);
 
     switch(sleep_inside_enclave){
+        case 0:
+            ocall_sleep(&sleep_time);
+        break;
         case 1:
         {
             long long int timestamp_start = -1;
@@ -145,15 +148,13 @@ void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity){
             }
         }
         break;
-        case 0:
-        ocall_sleep(&sleep_time);
-        break;
         case 2:
         {
-            for( long long int counter = 0; counter < 750*sleep_time; counter++){
+            for( long long int counter = 0; counter < 585*sleep_time; counter++){
                 for(int i = 0; i < 1000000; i++);
             }
         }
+        break;
     }
     
     sgx_thread_mutex_lock(&c->mutex);
