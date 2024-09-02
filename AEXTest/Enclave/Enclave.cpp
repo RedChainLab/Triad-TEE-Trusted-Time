@@ -107,11 +107,7 @@ void countADD(void){
     sgx_aex_mitigation_node_t node;
     sgx_register_aex_handler(&node, counter_aex_handler, (const void*)args);
     cond_struct_t *c = &cond;
-    sgx_thread_mutex_lock(&c->mutex);
-    while (!c->isCounting) {
-        sgx_thread_cond_wait(&c->startCounting, &c->mutex);
-    }
-    sgx_thread_mutex_unlock(&c->mutex);
+    while (!c->isCounting);
     while(c->isCounting == 1){
         add_count++; 
     }
@@ -130,11 +126,7 @@ void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity){
     sgx_aex_mitigation_node_t node;
     sgx_register_aex_handler(&node, monitor_aex_handler, (const void*)args);
     
-    sgx_thread_mutex_lock(&c->mutex);
     c->isCounting = 1;
-    sgx_thread_cond_signal(&c->startCounting);
-    sgx_thread_mutex_unlock(&c->mutex);
-
     switch(sleep_inside_enclave){
         case 0:
             ocall_sleep(&sleep_time);
@@ -172,11 +164,7 @@ void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity){
         }
         break;
     }
-    
-    sgx_thread_mutex_lock(&c->mutex);
     c->isCounting = 0;
-    sgx_thread_mutex_unlock(&c->mutex);
-
     sgx_unregister_aex_handler(monitor_aex_handler);
 
     if(verbosity>=1)
