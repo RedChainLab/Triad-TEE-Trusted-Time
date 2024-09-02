@@ -4,15 +4,44 @@ FILEPATH_PREFIX="out/count/count-`date +%Y-%m-%d-%H-%M-%S`"
 CORE_COUNTER=1
 CORE_MONITOR=2
 
-if test $# -lt 1 || test $1 -lt 0 || test $1 -gt 1
+VERBOSITY=1 # Required value for subsequent scripts
+
+sleep_time_to_string() 
+{
+    case $1 in
+        0)
+            echo "syscall sleep"
+            ;;
+        1)
+            echo "readTSC sleep"
+            ;;
+        2)
+            echo "in-enclave adder sleep"
+            ;;
+        3)
+            echo "asm adder sleep"
+            ;;
+        *)
+            echo "Invalid sleep type"
+            ;;
+    esac
+}
+
+if test $# = 0
 then
-    echo "Usage: $0 {0|1|2} [<sleep_time>*<repeats>]..."
+    echo "Usage: $0 <sleep_type>*<sleep_time>*<repeats>]..."
     exit 1
 fi
-for param in `echo $@ | cut -d' ' -f2-`
+for param
 do
-    sleep_time=`echo $param | cut -d'*' -f1`
-    repeats=`echo $param | cut -d'*' -f2`
+    sleep_type=`echo $param | cut -d'*' -f1`
+    sleep_time=`echo $param | cut -d'*' -f2`
+    repeats=`echo $param | cut -d'*' -f3`
+    if test $sleep_type -lt 0 || test $sleep_type -gt 3
+    then
+        echo "Sleep type must be between 0 and 3"
+        exit 1
+    fi
     if test $sleep_time -le 0
     then
         echo "Sleep time must be greater than 0"
@@ -23,11 +52,11 @@ do
         echo "Repeats must be greater than or equal to 0"
         exit 2
     fi
-    echo "${sleep_time}s sleep time, $repeats repeats"
+    echo "`sleep_time_to_string ${sleep_type} for `${sleep_time}s sleep time, $repeats repeats"
     for i in $(seq 1 $repeats)
     do
-        echo "> ${sleep_time}s sleep time, repetition $i"
-        ./app $sleep_time $1 $CORE_COUNTER $CORE_MONITOR > $FILEPATH_PREFIX-$1-$sleep_time-$i.csv
+        echo "> `sleep_time_to_string ${sleep_type}`, ${sleep_time}s sleep time, repetition $i"
+        ./app $sleep_time $1 $VERBOSITY $CORE_COUNTER $CORE_MONITOR > $FILEPATH_PREFIX-$sleep_type-$sleep_time-$i.csv
     done
-    echo "Finished generating $FILEPATH_PREFIX-$1-$sleep_time-*.csv"
+    echo "Finished generating $FILEPATH_PREFIX-$sleep_type-$sleep_time-*.csv"
 done

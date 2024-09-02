@@ -52,9 +52,11 @@ for timestamp in timestamps:
     y_closest_power_of_10 = 10 ** (math.floor(math.log10(agg_df['count'].count()))-1)
     ax.set_yticks(np.arange(0, agg_df['count'].count()+y_closest_power_of_10/2, y_closest_power_of_10))
 
-    x_closest_power_of_10 = 10 ** math.floor(math.log10(agg_df['count'].max()))
+    x_closest_power_of_10 = 10 ** math.floor(math.log10(agg_df['count'].max())-1)
     ax.set_xticks(np.arange(0, agg_df['count'].max()+x_closest_power_of_10/2, x_closest_power_of_10/2))
     ax.set_xticks(np.arange(0, agg_df['count'].max()+x_closest_power_of_10/2, x_closest_power_of_10/10), minor=True)
+
+    ax.set_xlim(agg_df['count'].min()-x_closest_power_of_10/2, agg_df['count'].max()+x_closest_power_of_10/2)
 
     ax.grid(True, which='major', linestyle='-')
     ax.grid(True, which='minor', linestyle=':', alpha=0.8)

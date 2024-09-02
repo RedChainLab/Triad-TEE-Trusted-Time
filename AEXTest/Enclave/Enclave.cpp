@@ -155,6 +155,22 @@ void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity){
             }
         }
         break;
+        case 3:
+        {
+            long long int counter = 2990000000;
+            __asm__ volatile(
+                "mov %0, %%rcx\n\t"
+                "mov %1, %%rax\n\t"
+                "1: dec %%rax\n\t"
+                "mov %%rax, (%%rcx)\n\t"
+                "test %%rax, %%rax\n\t"
+                "jnz 1b"
+                :
+                : "r"(&counter), "r"(counter)
+                : "rcx", "rax"
+            );
+        }
+        break;
     }
     
     sgx_thread_mutex_lock(&c->mutex);
