@@ -35,7 +35,7 @@ of using the makefile:
 ``` sh
 make run [CORE_MAIN=1] [CORE_ADD=2] [SLEEP_IN_ENCLAVE=0] [SLEEP_TIME=10] [VERBOSITY=1]
 ```
-with `<sleep_time>` the number of seconds to run the test; `<sleep_inside_enclave>` whether to measure elapsed time outside the enclave (with value `0`), inside using an adder (with value `1`), or inside using readTSC (with value `2`); `<core_main>` the core id where the main process and thread will be pinned (e.g., for core 2: value `2`); `<core_add>` the core id where the main process and thread will be pinned (e.g., for core 3: value `4`). `verbosity` determines the textual ouput: `0` for no output, `1` for minimal .csv-formated output about AEX events on the counter thread, `2` or more for both AEX monitoring on the counter and timer threads.
+with `<sleep_time>` the number of seconds to run the test; `<sleep_inside_enclave>` whether to measure elapsed time outside the enclave (with value `0`), inside using readTSC (with value `1`), or inside using an adder (with value `2`); `<core_main>` the core id where the main process and thread will be pinned (e.g., for core 2: value `2`); `<core_add>` the core id where the main process and thread will be pinned (e.g., for core 3: value `4`). `verbosity` determines the textual ouput: `0` for no output, `1` for minimal .csv-formated output about AEX events on the counter thread, `2` or more for both AEX monitoring on the counter and timer threads.
 
 The app outputs a .csv-like log of AEX events and at which count value they occured. The last line is the final count before the end of the execution. An example file could be ("//"-comments are absent in the real output):
 ``` c

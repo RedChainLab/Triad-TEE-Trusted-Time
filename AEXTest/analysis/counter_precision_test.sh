@@ -1,8 +1,12 @@
 #/bin/sh
-filepath_prefix="out/count/count-`date +%Y-%m-%d-%H-%M-%S`"
+FILEPATH_PREFIX="out/count/count-`date +%Y-%m-%d-%H-%M-%S`"
+
+CORE_COUNTER=1
+CORE_MONITOR=2
+
 if test $# -lt 1 || test $1 -lt 0 || test $1 -gt 1
 then
-    echo "Usage: $0 {0|1} [<sleep_time>*<repeats>]..."
+    echo "Usage: $0 {0|1|2} [<sleep_time>*<repeats>]..."
     exit 1
 fi
 for param in `echo $@ | cut -d' ' -f2-`
@@ -22,8 +26,8 @@ do
     echo "${sleep_time}s sleep time, $repeats repeats"
     for i in $(seq 1 $repeats)
     do
-        echo "> ${sleep_time}ms sleep time, repetition $i"
-        ./app $sleep_time $1 1 2 > $filepath_prefix-$1-$sleep_time-$i.csv
+        echo "> ${sleep_time}s sleep time, repetition $i"
+        ./app $sleep_time $1 $CORE_COUNTER $CORE_MONITOR > $FILEPATH_PREFIX-$1-$sleep_time-$i.csv
     done
-    echo "Finished generating $filepath_prefix-$1-$sleep_time-*.csv"
+    echo "Finished generating $FILEPATH_PREFIX-$1-$sleep_time-*.csv"
 done
