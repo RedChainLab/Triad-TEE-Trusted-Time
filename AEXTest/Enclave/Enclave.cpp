@@ -119,7 +119,7 @@ void countADD(void){
 }
 
 
-void main_thread(int sleep_time, int sleep_inside_enclave){
+void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity){
     /*
     the main thread that will be called by the application.
     */
@@ -162,13 +162,23 @@ void main_thread(int sleep_time, int sleep_inside_enclave){
 
     sgx_unregister_aex_handler(monitor_aex_handler);
 
-    t_print("idx;count\n");
-    printArray(count_aex, aex_count);
-    t_print("idx;monitor_aex_count\n");
-    printArray(monitor_aex, monitor_aex_count);
-    //t_print("%lld;%lld\n", aex_count, add_count);
-    t_print("counter_aex_count;monitor_aex_count;final_count\n");
-    t_print("%lld;%lld;%lld\n", aex_count, monitor_aex_count, add_count);
-    //t_print("add_count : %lld\n", add_count);
-    //t_print("Number of AEX : %d\n", aex_count);
+    if(verbosity>=1)
+    {
+        t_print("idx;count\n");
+        printArray(count_aex, aex_count);
+    }
+    if(verbosity>=2)
+    {
+        t_print("idx;monitor_aex_count\n");
+        printArray(monitor_aex, monitor_aex_count);
+    }
+    if(verbosity==1)
+    {
+        t_print("%lld;%lld\n", aex_count, add_count);
+    }
+    if(verbosity>=2)
+    {
+        t_print("counter_aex_count;monitor_aex_count;final_count\n");
+        t_print("%lld;%lld;%lld\n", aex_count, monitor_aex_count, add_count);
+    }
 }

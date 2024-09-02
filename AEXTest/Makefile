@@ -33,8 +33,9 @@
 
 SLEEP_TIME?=10
 SLEEP_IN_ENCLAVE?=0
-CORE_MAIN?=2
-CORE_ADD?=4
+CORE_MAIN?=1
+CORE_ADD?=2
+VERBOSITY?=1
 
 LOG_FILE?=aex-$(SLEEP_TIME)-$(shell date +'%Y-%m-%d-%H-%M-%S').csv
 
@@ -201,13 +202,13 @@ build: all
 run: all
 ifneq ($(Build_Mode), HW_RELEASE)
 	@echo $(CURDIR)/$(App_Name) $(SLEEP_TIME) $(SLEEP_IN_ENCLAVE) $(CORE_MAIN) $(CORE_ADD)
-	@$(CURDIR)/$(App_Name) $(SLEEP_TIME) $(SLEEP_IN_ENCLAVE) $(CORE_MAIN) $(CORE_ADD)
+	@$(CURDIR)/$(App_Name) $(SLEEP_TIME) $(SLEEP_IN_ENCLAVE) $(VERBOSITY) $(CORE_MAIN) $(CORE_ADD)
 	@echo "RUN  =>  $(App_Name) [$(SGX_MODE)|$(SGX_ARCH), OK]"
 endif
 
 exp: all
 	@echo $(CURDIR)/$(App_Name) $(SLEEP_TIME) $(SLEEP_IN_ENCLAVE) $(CORE_MAIN) $(CORE_ADD) > $(CURDIR)/$(LOG_FILE)
-	@$(CURDIR)/$(App_Name) $(SLEEP_TIME) $(SLEEP_IN_ENCLAVE) $(CORE_MAIN) $(CORE_ADD) > $(CURDIR)/$(LOG_FILE)
+	@$(CURDIR)/$(App_Name) $(SLEEP_TIME) $(SLEEP_IN_ENCLAVE) $(VERBOSITY) $(CORE_MAIN) $(CORE_ADD) > $(CURDIR)/$(LOG_FILE)
 	@echo "RUN  =>  $(App_Name) [$(SGX_MODE)|$(SGX_ARCH), OK]"
 
 ######## App Objects ########

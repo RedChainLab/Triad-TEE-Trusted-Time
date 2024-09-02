@@ -37,14 +37,14 @@ enclave {
     from "sgx_pthread.edl" import *;
 
     trusted {
-        public void main_thread(int sleep_time, int sleep_inside_enclave) transition_using_threads;
-        public void countADD(void) transition_using_threads;
+        public void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity);
+        public void countADD(void);
     };
 
     untrusted {
         void ocall_print_string([in, string] const char *str);
-        void ocall_readTSC([in, out] long long* timestamps) transition_using_threads;
-        void ocall_sleep([in, out] int* time) transition_using_threads;
+        void ocall_readTSC([in, out] long long* timestamps);
+        void ocall_sleep([in, out] int* time);
         void see_pid([in, string] const char* str);
     };
 };

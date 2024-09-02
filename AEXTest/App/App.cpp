@@ -286,7 +286,7 @@ void ecall_add_thread(int set_aff, int core_add)
         abort();
 }
 
-void ecall_main_thread(int sleep_time, int sleep_inside_enclave, int set_aff, int core_main)
+void ecall_main_thread(int sleep_time, int sleep_inside_enclave, int verbosity, int set_aff, int core_main)
 {
     /*
     the function that enters the enclave to lanuch the main thread.
@@ -296,18 +296,18 @@ void ecall_main_thread(int sleep_time, int sleep_inside_enclave, int set_aff, in
         set_thread_affinity(core_main);
     }
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
-    ret = main_thread(global_eid, sleep_time, sleep_inside_enclave);
+    ret = main_thread(global_eid, sleep_time, sleep_inside_enclave, verbosity);
     if (ret != SGX_SUCCESS)
         abort();
 }
 
-void start_threads(int sleep_time, int sleep_inside_enclave, int set_aff, int core_main, int core_add)
+void start_threads(int sleep_time, int sleep_inside_enclave, int set_aff, int verbosity, int core_main, int core_add)
 {
     /*
     intialize the threads and start them.
     */
     //printf("Info: Starting both threads...  \n");
-    std::thread calib(ecall_main_thread, sleep_time, sleep_inside_enclave, set_aff, core_main);
+    std::thread calib(ecall_main_thread, sleep_time, sleep_inside_enclave, verbosity, set_aff, core_main);
     std::thread add(ecall_add_thread, set_aff, core_add);
     calib.join();
     add.join();
@@ -319,25 +319,27 @@ int SGX_CDECL main(int argc, char *argv[])
 {
     (void) argc;
     (void) argv;
-    if(argc !=3 && argc != 5)
+    if(argc !=4 && argc != 6)
     {
-        printf("Usage: %s <sleep_time> <sleep_inside_enclave> [<core_add> <core_main>]\n", argv[0]);
+        printf("Usage: %s <sleep_time> <sleep_inside_enclave> <verbosity> [<core_add> <core_main>]\n", argv[0]);
         return -1;
     }
     int sleep_time = 0;
     int sleep_inside_enclave = 0;
     int set_aff = 0;
+    int verbosity = 0;
     int core_main = -1;
     int core_add = -1;
     try
     {
         sleep_time = atoi(argv[1]);
         sleep_inside_enclave = atoi(argv[2]);
-        if (argc==5)
+        verbosity = atoi(argv[3]);
+        if (argc==6)
         {
             set_aff = 1;
-            core_add = atoi(argv[3]);
-            core_main = atoi(argv[4]);
+            core_add = atoi(argv[4]);
+            core_main = atoi(argv[5]);
         }
     }
     catch (const std::exception& e)
@@ -363,7 +365,7 @@ int SGX_CDECL main(int argc, char *argv[])
         //set_affinity(core_parent);
     }
 
-    start_threads(sleep_time, sleep_inside_enclave, set_aff, core_main, core_add);
+    start_threads(sleep_time, sleep_inside_enclave, set_aff, verbosity, core_main, core_add);
 
     sgx_destroy_enclave(global_eid);
     return 0;
