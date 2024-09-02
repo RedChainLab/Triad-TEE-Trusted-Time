@@ -150,9 +150,8 @@ void main_thread(int sleep_time, int sleep_inside_enclave){
         break;
         case 2:
         {
-            long long int counter = 0;
-            while(counter < 720000000*sleep_time){
-                counter++;
+            for( long long int counter = 0; counter < 750*sleep_time; counter++){
+                for(int i = 0; i < 1000000; i++);
             }
         }
     }
