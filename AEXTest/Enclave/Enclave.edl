@@ -39,6 +39,7 @@ enclave {
     trusted {
         public void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity);
         public void countADD(void);
+        public void loopReadTSC(void);
     };
 
     untrusted {

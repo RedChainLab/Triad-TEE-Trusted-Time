@@ -53,6 +53,13 @@ typedef struct {
 
 }cond_struct_t;
 
+typedef enum {
+    SYSCALL_SLEEP = 0,
+    READTSC_SLEEP = 1,
+    C_ADDER_SLEEP = 2,
+    ASM_ADDER_SLEEP = 3
+}sleep_type_t;
+
 cond_struct_t cond = {0, 0, SGX_THREAD_COND_INITIALIZER, SGX_THREAD_MUTEX_INITIALIZER};
 
 void t_print(const char *fmt, ...)
@@ -89,12 +96,12 @@ static void monitor_aex_handler(const sgx_exception_info_t *info, const void * a
     monitor_aex_count++;
 }
 
-void printArray(long long int *arr, long long int size){
+void printArray(long long int *arr, long long int size, long long int reference){
     /*
     Print a array of size SIZE, which contains the number of ADD operations performed before each AEX occurs.
     */
     for(int i = 0; i < size ; i++){
-        t_print("%d;%lld\n", i, arr[i]);
+        t_print("%d;%lld\n", i, arr[i]-reference);
     }
 }
 
@@ -114,6 +121,21 @@ void countADD(void){
     sgx_unregister_aex_handler(counter_aex_handler);
 }
 
+void loopReadTSC(void){
+    /*
+    The function that will be called in another thread to perform ADD operations.
+    */
+    //see_pid("countTSC");
+    const char* args = NULL; 
+    sgx_aex_mitigation_node_t node;
+    sgx_register_aex_handler(&node, counter_aex_handler, (const void*)args);
+    cond_struct_t *c = &cond;
+    while (!c->isCounting);
+    while(c->isCounting){
+        ocall_readTSC(&add_count);
+    }
+    sgx_unregister_aex_handler(counter_aex_handler);
+}
 
 void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity){
     /*
@@ -126,30 +148,46 @@ void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity){
     sgx_aex_mitigation_node_t node;
     sgx_register_aex_handler(&node, monitor_aex_handler, (const void*)args);
     
+    long long int reference = 0;
     c->isCounting = 1;
     switch(sleep_inside_enclave){
-        case 0:
+        case SYSCALL_SLEEP:
+            do
+            {
+                reference = add_count;
+            } while(reference == 0);
             ocall_sleep(&sleep_time);
         break;
-        case 1:
+        case READTSC_SLEEP:
         {
-            long long int timestamp_start = -1;
-            ocall_readTSC(&timestamp_start);
-            while(tsc-timestamp_start < 3000000000*sleep_time){
+            do
+            {
+                reference = add_count;
+            } while(reference == 0);
+            ocall_readTSC(&reference);
+            while(tsc-reference < 3000000000*sleep_time){
                 ocall_readTSC(&tsc);
             }
         }
         break;
-        case 2:
+        case C_ADDER_SLEEP:
         {
+            do
+            {
+                reference = add_count;
+            } while(reference == 0);
             for( long long int counter = 0; counter < 529*sleep_time; counter++){
                 for(int i = 0; i < 1000000; i++);
             }
         }
         break;
-        case 3:
+        case ASM_ADDER_SLEEP:
         {
-            long long int counter = 1500000000;
+            do
+            {
+                reference = add_count;
+            } while(reference == 0);
+            long long int counter = 1500000*sleep_time;
             __asm__ volatile(
                 "mov %0, %%rcx\n\t"
                 "mov %1, %%rax\n\t"
@@ -170,20 +208,20 @@ void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity){
     if(verbosity>=1)
     {
         t_print("idx;count\n");
-        printArray(count_aex, aex_count);
+        printArray(count_aex, aex_count, reference);
     }
     if(verbosity>=2)
     {
         t_print("idx;monitor_aex_count\n");
-        printArray(monitor_aex, monitor_aex_count);
+        printArray(monitor_aex, monitor_aex_count, reference);
     }
     if(verbosity==1)
     {
-        t_print("%lld;%lld\n", aex_count, add_count);
+        t_print("%lld;%lld\n", aex_count, add_count-reference);
     }
     if(verbosity>=2)
     {
         t_print("counter_aex_count;monitor_aex_count;final_count\n");
-        t_print("%lld;%lld;%lld\n", aex_count, monitor_aex_count, add_count);
+        t_print("%lld;%lld;%lld\n", aex_count, monitor_aex_count, add_count-reference);
     }
 }

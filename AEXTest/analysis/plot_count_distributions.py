@@ -57,9 +57,11 @@ for timestamp in timestamps:
     ax.set_xticks(np.arange(0, agg_df['count'].max()+x_closest_power_of_10/2, x_closest_power_of_10/10), minor=True)
 
     ax.set_xlim(agg_df['count'].min()-x_closest_power_of_10/2, agg_df['count'].max()+x_closest_power_of_10/2)
-
+    ax.set_yscale('log')
     ax.grid(True, which='major', linestyle='-')
     ax.grid(True, which='minor', linestyle=':', alpha=0.8)
+
+    print("mean:",agg_df['count'].mean(),"std:",agg_df['count'].std())
 
     fig.savefig(f'fig/count-{timestamp}-{in_enclave}-{sleep_time_secs}.png', bbox_inches='tight')
 

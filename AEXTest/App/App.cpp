@@ -281,7 +281,7 @@ void ecall_add_thread(int set_aff, int core_add)
         set_thread_affinity(core_add);
     }
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
-    ret = countADD(global_eid);
+    ret = loopReadTSC(global_eid);
     if (ret != SGX_SUCCESS)
         abort();
 }
