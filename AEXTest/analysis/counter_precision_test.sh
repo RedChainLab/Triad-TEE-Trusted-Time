@@ -52,7 +52,7 @@ do
         echo "Repeats must be greater than or equal to 0"
         exit 2
     fi
-    echo "`sleep_time_to_string ${sleep_type} for `${sleep_time}s sleep time, $repeats repeats"
+    echo "`sleep_time_to_string ${sleep_type}` for ${sleep_time}s sleep time, $repeats repeats"
     for i in $(seq 1 $repeats)
     do
         echo "> `sleep_time_to_string ${sleep_type}`, ${sleep_time}s sleep time, repetition $i"

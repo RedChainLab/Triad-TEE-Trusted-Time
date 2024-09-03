@@ -142,14 +142,14 @@ void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity){
         break;
         case 2:
         {
-            for( long long int counter = 0; counter < 585*sleep_time; counter++){
+            for( long long int counter = 0; counter < 529*sleep_time; counter++){
                 for(int i = 0; i < 1000000; i++);
             }
         }
         break;
         case 3:
         {
-            long long int counter = 2990000000;
+            long long int counter = 1500000000;
             __asm__ volatile(
                 "mov %0, %%rcx\n\t"
                 "mov %1, %%rax\n\t"
