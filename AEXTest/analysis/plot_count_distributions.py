@@ -11,10 +11,14 @@ params = {'text.usetex' : True,
           }
 plt.rcParams.update(params) 
 
+log=False
+
 # Files in out/count directory are in the naming format count-<timestamp>-<in_enclave>-<sleep_time_secs>-<repeat_id>.csv
 # Get <in_enclave> <sleep_time_secs> from command line arguments
 in_enclave = sys.argv[1]
 sleep_time_secs = sys.argv[2]
+if len(sys.argv) > 3:
+  log = (sys.argv[3] == "1")
 
 # Get all files in out/count directory that match in_enclave and sleep_time_secs
 import os
@@ -52,16 +56,17 @@ for timestamp in timestamps:
     y_closest_power_of_10 = 10 ** (math.floor(math.log10(agg_df['count'].count()))-1)
     ax.set_yticks(np.arange(0, agg_df['count'].count()+y_closest_power_of_10/2, y_closest_power_of_10))
 
-    x_closest_power_of_10 = 10 ** math.floor(math.log10(agg_df['count'].max())-1)
+    x_closest_power_of_10 = 10 ** math.floor(math.log10(agg_df['count'].max()))
     ax.set_xticks(np.arange(0, agg_df['count'].max()+x_closest_power_of_10/2, x_closest_power_of_10/2))
     ax.set_xticks(np.arange(0, agg_df['count'].max()+x_closest_power_of_10/2, x_closest_power_of_10/10), minor=True)
 
     ax.set_xlim(agg_df['count'].min()-x_closest_power_of_10/2, agg_df['count'].max()+x_closest_power_of_10/2)
-    ax.set_yscale('log')
+    if log:
+      ax.set_yscale('log')
     ax.grid(True, which='major', linestyle='-')
     ax.grid(True, which='minor', linestyle=':', alpha=0.8)
 
     print("mean:",agg_df['count'].mean(),"std:",agg_df['count'].std())
 
-    fig.savefig(f'fig/count-{timestamp}-{in_enclave}-{sleep_time_secs}.png', bbox_inches='tight')
+    fig.savefig(f'fig/count-{timestamp}-{in_enclave}-{sleep_time_secs}{"-log" if log else ""}.png', bbox_inches='tight')
 
