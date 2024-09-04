@@ -24,7 +24,7 @@ if len(sys.argv) > 3:
 import os
 import re
 import progressbar
-files = os.listdir('out/count')
+files = os.listdir('out/count1')
 files = [f for f in files if re.match(f'count-.*-{in_enclave}-{sleep_time_secs}-.*', f)]
 #print(files)
 
