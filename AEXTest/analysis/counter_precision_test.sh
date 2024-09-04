@@ -1,10 +1,10 @@
 #/bin/sh
-FILEPATH_PREFIX="out/count/count-`date +%Y-%m-%d-%H-%M-%S`"
-
 CORE_COUNTER=1
 CORE_MONITOR=2
 
-VERBOSITY=1 # Required value for subsequent scripts
+VERBOSITY=2 # Required value for subsequent scripts
+
+FILEPATH_PREFIX="out/count${VERBOSITY}/count-`date +%Y-%m-%d-%H-%M-%S`"
 
 sleep_time_to_string() 
 {
