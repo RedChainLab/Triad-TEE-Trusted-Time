@@ -7,9 +7,11 @@
 *.so
 *.o
 app
-*/build/*
+build
 tls_server_host
 ssl_client
 *.csv
 *.pdf
 *.png
+client
+server
