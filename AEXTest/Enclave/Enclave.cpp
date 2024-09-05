@@ -206,7 +206,6 @@ void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity){
             reference = rdtsc();
             while(tsc-reference < 3000000000*sleep_time){
                 tsc = rdtsc();
-                t_print("tsc: %lld\n", tsc-reference);
             }
         }
         break;
