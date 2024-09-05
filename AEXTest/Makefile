@@ -211,6 +211,9 @@ exp: all
 	@$(CURDIR)/$(App_Name) $(SLEEP_TIME) $(SLEEP_IN_ENCLAVE) $(VERBOSITY) $(CORE_MAIN) $(CORE_ADD) > $(CURDIR)/$(LOG_FILE)
 	@echo "RUN  =>  $(App_Name) [$(SGX_MODE)|$(SGX_ARCH), OK]"
 
+tsc: all
+	g++ -o tsc tsc_offsetter/tsc_offsetter.cpp
+
 ######## App Objects ########
 
 App/Enclave_u.h: $(SGX_EDGER8R) Enclave/Enclave.edl
@@ -269,4 +272,4 @@ endif
 
 .PHONY: clean
 clean:
-	@rm -f $(App_Name) $(Enclave_Name) $(Signed_Enclave_Name) $(App_Cpp_Objects) App/Enclave_u.* $(Enclave_Cpp_Objects) Enclave/Enclave_t.*
+	@rm -f $(App_Name) $(Enclave_Name) $(Signed_Enclave_Name) $(App_Cpp_Objects) App/Enclave_u.* $(Enclave_Cpp_Objects) Enclave/Enclave_t.* tsc

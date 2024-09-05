@@ -271,7 +271,7 @@ void ocall_sleep(int* sec) {
     //printf("Done sleeping outside the enclave\n");
 }
 
-void ecall_add_thread(int set_aff, int core_add)
+void ecall_add_thread(int sgx_type, int set_aff, int core_add)
 {
     /*
     the function that enters the enclave to perform ADD operations.
@@ -281,7 +281,18 @@ void ecall_add_thread(int set_aff, int core_add)
         set_thread_affinity(core_add);
     }
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
-    ret = loopReadTSC(global_eid);
+    switch (sgx_type)
+    {
+        case 1:
+            ret = loopOReadTSC(global_eid);
+            break;
+        case 2:
+            ret = loopEReadTSC(global_eid);
+            break;
+        default:
+            std::cerr << "Error: Invalid SGX type" << std::endl;
+            break;
+    }
     if (ret != SGX_SUCCESS)
         abort();
 }
@@ -301,14 +312,14 @@ void ecall_main_thread(int sleep_time, int sleep_inside_enclave, int verbosity, 
         abort();
 }
 
-void start_threads(int sleep_time, int sleep_inside_enclave, int set_aff, int verbosity, int core_main, int core_add)
+void start_threads(int sgx_type, int sleep_time, int sleep_inside_enclave, int set_aff, int verbosity, int core_main, int core_add)
 {
     /*
     intialize the threads and start them.
     */
     //printf("Info: Starting both threads...  \n");
     std::thread calib(ecall_main_thread, sleep_time, sleep_inside_enclave, verbosity, set_aff, core_main);
-    std::thread add(ecall_add_thread, set_aff, core_add);
+    std::thread add(ecall_add_thread, sgx_type, set_aff, core_add);
     calib.join();
     add.join();
 }
@@ -319,11 +330,12 @@ int SGX_CDECL main(int argc, char *argv[])
 {
     (void) argc;
     (void) argv;
-    if(argc !=4 && argc != 6)
+    if(argc !=5 && argc != 7)
     {
-        printf("Usage: %s <sleep_time> <sleep_inside_enclave> <verbosity> [<core_add> <core_main>]\n", argv[0]);
+        printf("Usage: %s <SGX1|2> <sleep_time> <sleep_inside_enclave> <verbosity> [<core_add> <core_main>]\n", argv[0]);
         return -1;
     }
+    int sgx_type = 0;
     int sleep_time = 0;
     int sleep_inside_enclave = 0;
     int set_aff = 0;
@@ -332,14 +344,16 @@ int SGX_CDECL main(int argc, char *argv[])
     int core_add = -1;
     try
     {
-        sleep_time = atoi(argv[1]);
-        sleep_inside_enclave = atoi(argv[2]);
-        verbosity = atoi(argv[3]);
-        if (argc==6)
+        sgx_type = atoi(argv[1]);
+        assert (sgx_type == 1 || sgx_type == 2);
+        sleep_time = atoi(argv[2]);
+        sleep_inside_enclave = atoi(argv[3]);
+        verbosity = atoi(argv[4]);
+        if (argc==7)
         {
             set_aff = 1;
-            core_add = atoi(argv[4]);
-            core_main = atoi(argv[5]);
+            core_add = atoi(argv[5]);
+            core_main = atoi(argv[6]);
         }
     }
     catch (const std::exception& e)
@@ -365,7 +379,7 @@ int SGX_CDECL main(int argc, char *argv[])
         //set_affinity(core_parent);
     }
 
-    start_threads(sleep_time, sleep_inside_enclave, set_aff, verbosity, core_main, core_add);
+    start_threads(sgx_type, sleep_time, sleep_inside_enclave, set_aff, verbosity, core_main, core_add);
 
     sgx_destroy_enclave(global_eid);
     return 0;

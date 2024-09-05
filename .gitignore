@@ -15,3 +15,4 @@ ssl_client
 *.png
 client
 server
+tsc

@@ -55,9 +55,10 @@ typedef struct {
 
 typedef enum {
     SYSCALL_SLEEP = 0,
-    READTSC_SLEEP = 1,
-    C_ADDER_SLEEP = 2,
-    ASM_ADDER_SLEEP = 3
+    O_READTSC_SLEEP = 1,
+    E_READTSC_SLEEP = 2,
+    C_ADDER_SLEEP = 3,
+    ASM_ADDER_SLEEP = 4
 }sleep_type_t;
 
 cond_struct_t cond = {0, 0, SGX_THREAD_COND_INITIALIZER, SGX_THREAD_MUTEX_INITIALIZER};
@@ -121,7 +122,7 @@ void countADD(void){
     sgx_unregister_aex_handler(counter_aex_handler);
 }
 
-void loopReadTSC(void){
+void loopOReadTSC(void){
     /*
     The function that will be called in another thread to perform ADD operations.
     */
@@ -133,6 +134,32 @@ void loopReadTSC(void){
     while (!c->isCounting);
     while(c->isCounting){
         ocall_readTSC(&add_count);
+    }
+    sgx_unregister_aex_handler(counter_aex_handler);
+}
+
+inline long long int rdtsc(void){
+    /*
+    Read the TSC register
+    */
+    unsigned int lo, hi;
+    __asm__ __volatile__("rdtsc" : "=a" (lo), "=d" (hi));
+    //t_print("lo: %d, hi: %d\n", lo, hi);
+    return ((uint64_t)hi << 32) | lo;
+}
+
+void loopEReadTSC(void){
+    /*
+    The function that will be called in another thread to perform ADD operations.
+    */
+    //see_pid("countTSC");
+    const char* args = NULL; 
+    sgx_aex_mitigation_node_t node;
+    sgx_register_aex_handler(&node, counter_aex_handler, (const void*)args);
+    cond_struct_t *c = &cond;
+    while (!c->isCounting);
+    while(c->isCounting){
+        add_count = rdtsc();
     }
     sgx_unregister_aex_handler(counter_aex_handler);
 }
@@ -158,7 +185,7 @@ void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity){
             } while(reference == 0);
             ocall_sleep(&sleep_time);
         break;
-        case READTSC_SLEEP:
+        case O_READTSC_SLEEP:
         {
             do
             {
@@ -167,6 +194,19 @@ void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity){
             ocall_readTSC(&reference);
             while(tsc-reference < 3000000000*sleep_time){
                 ocall_readTSC(&tsc);
+            }
+        }
+        break;
+        case E_READTSC_SLEEP:
+        {
+            do
+            {
+                reference = add_count;
+            } while(reference == 0);
+            reference = rdtsc();
+            while(tsc-reference < 3000000000*sleep_time){
+                tsc = rdtsc();
+                t_print("tsc: %lld\n", tsc-reference);
             }
         }
         break;
