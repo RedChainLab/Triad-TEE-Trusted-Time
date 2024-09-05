@@ -48,15 +48,16 @@ void write_msr(int cpu, uint32_t msr, uint64_t data) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 3) {
-        std::cerr << "Usage: " << argv[0] << " <cpu> <sleep_secs>" << std::endl;
+    if (argc != 4) {
+        std::cerr << "Usage: " << argv[0] << " <target-core> <read-core> <sleep_secs>" << std::endl;
         return 1;
     }
-    int cpu = std::atoi(argv[1]);
-    int sleep_secs = std::atoi(argv[2]);
+    int target_core = std::atoi(argv[1]);
+    int read_core = std::atoi(argv[2]);
+    int sleep_secs = std::atoi(argv[3]);
     uint32_t msr = 0x10;  // MSR IA32_TIME_STAMP_COUNTER
-    uint64_t value = read_msr(cpu, msr);
+    uint64_t value = read_msr(read_core, msr);
     std::cout << "MSR 0x" << std::hex << msr << " = 0x" << value << std::endl;
-    write_msr(cpu, msr, value + sleep_secs*FREQ);
+    write_msr(target_core, msr, value + sleep_secs*FREQ);
     return 0;
 }
