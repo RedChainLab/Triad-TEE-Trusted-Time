@@ -1,6 +1,6 @@
 #/bin/sh
-CORE_COUNTER=1
-CORE_MONITOR=2
+CORE_COUNTER=2
+CORE_MONITOR=3
 
 VERBOSITY=2 # Required value for subsequent scripts
 
@@ -13,12 +13,15 @@ sleep_time_to_string()
             echo "syscall sleep"
             ;;
         1)
-            echo "readTSC sleep"
+            echo "ocall readTSC sleep"
             ;;
         2)
-            echo "in-enclave adder sleep"
+            echo "enclave readTSC sleep"
             ;;
         3)
+            echo "in-enclave adder sleep"
+            ;;
+        4)
             echo "asm adder sleep"
             ;;
         *)
@@ -34,9 +37,15 @@ then
 fi
 for param
 do
-    sleep_type=`echo $param | cut -d'*' -f1`
-    sleep_time=`echo $param | cut -d'*' -f2`
-    repeats=`echo $param | cut -d'*' -f3`
+    sgx_type=`echo $param | cut -d'*' -f1`
+    sleep_type=`echo $param | cut -d'*' -f2`
+    sleep_time=`echo $param | cut -d'*' -f3`
+    repeats=`echo $param | cut -d'*' -f4`
+    if test $sgx_type -lt 1 || test $sgx_type -gt 2
+    then
+        echo "SGX type must be 1 or 2"
+        exit 1
+    fi
     if test $sleep_type -lt 0 || test $sleep_type -gt 3
     then
         echo "Sleep type must be between 0 and 3"
@@ -56,7 +65,7 @@ do
     for i in $(seq 1 $repeats)
     do
         echo "> `sleep_time_to_string ${sleep_type}`, ${sleep_time}s sleep time, repetition $i"
-        ./app $sleep_time $1 $VERBOSITY $CORE_COUNTER $CORE_MONITOR > $FILEPATH_PREFIX-$sleep_type-$sleep_time-$i.csv
+        ./app $sgx_type $sleep_time $sleep_type $VERBOSITY $CORE_COUNTER $CORE_MONITOR > $FILEPATH_PREFIX-$sleep_type-$sleep_time-$i.csv
     done
     echo "Finished generating $FILEPATH_PREFIX-$sleep_type-$sleep_time-*.csv"
 done

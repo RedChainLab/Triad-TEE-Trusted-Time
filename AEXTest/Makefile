@@ -31,13 +31,14 @@
 
 ######## AEX Test Settings ########
 
+SGX_TYPE?=1
 SLEEP_TIME?=10
-SLEEP_IN_ENCLAVE?=0
+SLEEP_TYPE?=0
 CORE_MAIN?=1
 CORE_ADD?=2
 VERBOSITY?=1
 
-LOG_FILE?=aex-$(SLEEP_TIME)-$(shell date +'%Y-%m-%d-%H-%M-%S').csv
+LOG_FILE?=aex-$(SGX_TYPE)-$(SLEEP_TYPE)-$(SLEEP_TIME)-$(VERBOSITY)-$(shell date +'%Y-%m-%d-%H-%M-%S').csv
 
 ######## SGX SDK Settings ########
 
@@ -201,14 +202,14 @@ build: all
 
 run: all
 ifneq ($(Build_Mode), HW_RELEASE)
-	@echo $(CURDIR)/$(App_Name) $(SLEEP_TIME) $(SLEEP_IN_ENCLAVE) $(CORE_MAIN) $(CORE_ADD)
-	@$(CURDIR)/$(App_Name) $(SLEEP_TIME) $(SLEEP_IN_ENCLAVE) $(VERBOSITY) $(CORE_MAIN) $(CORE_ADD)
+	@echo $(CURDIR)/$(App_Name) $(SGX_TYPE) $(SLEEP_TIME) $(SLEEP_TYPE) $(VERBOSITY) $(CORE_MAIN) $(CORE_ADD)
+	@$(CURDIR)/$(App_Name) $(SGX_TYPE) $(SLEEP_TIME) $(SLEEP_TYPE) $(VERBOSITY) $(CORE_MAIN) $(CORE_ADD)
 	@echo "RUN  =>  $(App_Name) [$(SGX_MODE)|$(SGX_ARCH), OK]"
 endif
 
 exp: all
-	@echo $(CURDIR)/$(App_Name) $(SLEEP_TIME) $(SLEEP_IN_ENCLAVE) $(CORE_MAIN) $(CORE_ADD) > $(CURDIR)/$(LOG_FILE)
-	@$(CURDIR)/$(App_Name) $(SLEEP_TIME) $(SLEEP_IN_ENCLAVE) $(VERBOSITY) $(CORE_MAIN) $(CORE_ADD) > $(CURDIR)/$(LOG_FILE)
+	@echo $(CURDIR)/$(App_Name) $(SGX_TYPE) $(SLEEP_TIME) $(SLEEP_TYPE) $(VERBOSITY) $(CORE_MAIN) $(CORE_ADD) > $(CURDIR)/$(LOG_FILE)
+	@$(CURDIR)/$(App_Name) $(SGX_TYPE) $(SLEEP_TIME) $(SLEEP_TYPE) $(VERBOSITY) $(CORE_MAIN) $(CORE_ADD) > $(CURDIR)/$(LOG_FILE)
 	@echo "RUN  =>  $(App_Name) [$(SGX_MODE)|$(SGX_ARCH), OK]"
 
 tsc: all

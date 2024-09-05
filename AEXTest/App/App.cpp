@@ -332,7 +332,7 @@ int SGX_CDECL main(int argc, char *argv[])
     (void) argv;
     if(argc !=5 && argc != 7)
     {
-        printf("Usage: %s <SGX1|2> <sleep_time> <sleep_inside_enclave> <verbosity> [<core_add> <core_main>]\n", argv[0]);
+        printf("Usage: %s <SGX_type> <sleep_time> <sleep_type> <verbosity> [<core_add> <core_main>]\n", argv[0]);
         return -1;
     }
     int sgx_type = 0;

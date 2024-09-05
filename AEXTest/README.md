@@ -29,13 +29,13 @@ A makefile recipe `make run` is available with example parameters.
 
 The command line template is the following:
 ``` sh
-./app <sleep_time> <sleep_inside_enclave> <verbosity> [<core_main> <core_add>]
+./app <SGX_type> <sleep_time> <sleep_type> <verbosity> [<core_main> <core_add>]
 ```
 of using the makefile:
 ``` sh
-make run [CORE_MAIN=1] [CORE_ADD=2] [SLEEP_IN_ENCLAVE=0] [SLEEP_TIME=10] [VERBOSITY=1]
+make run [SGX=1] [CORE_MAIN=1] [CORE_ADD=2] [SLEEP_TYPE=0] [SLEEP_TIME=10] [VERBOSITY=1]
 ```
-with `<sleep_time>` the number of seconds to run the test; `<sleep_inside_enclave>` whether to measure elapsed time outside the enclave (with value `0`), inside using readTSC (with value `1`), or inside using an adder (with value `2`); `<core_main>` the core id where the main process and thread will be pinned (e.g., for core 2: value `2`); `<core_add>` the core id where the main process and thread will be pinned (e.g., for core 3: value `4`). `verbosity` determines the textual ouput: `0` for no output, `1` for minimal .csv-formated output about AEX events on the counter thread, `2` or more for both AEX monitoring on the counter and timer threads.
+with `<SGX_type>` the SGX hardware type (SGX1 or SGX2); `<sleep_time>` the number of seconds to run the test; `<sleep_type>` whether to measure elapsed time outside the enclave (with value `0`), inside using ocall-based readTSC (with value `1`), an in-enclave readTSC (with value `2`), inside the enclave using a C++ adder (with value `3`), or inside the enclave using an asm adder (with value `4`); `<core_main>` the core id where the main process and thread will be pinned (e.g., for core 2: value `2`); `<core_add>` the core id where the main process and thread will be pinned (e.g., for core 3: value `3`). `verbosity` determines the textual ouput: `0` for no output, `1` for minimal .csv-formated output about AEX events on the counter thread, `2` or more for both AEX monitoring on the counter and timer threads.
 
 The app outputs a .csv-like log of AEX events and at which count value they occured. The last line is the final count before the end of the execution. An example file could be ("//"-comments are absent in the real output):
 ``` c
@@ -51,7 +51,7 @@ idx;count
 
 A makefile recipe `make exp` is available that automatically outputs results in a timestamped file `aex-<sleep_time_s>-<timestamp>.csv` (e.g., `aex-30-2024-08-19-10-10-05.csv`):
 ``` sh
-make exp [CORE_MAIN=1] [CORE_ADD=2] [SLEEP_IN_ENCLAVE=0] [SLEEP_TIME=10]
+make exp [SGX=1] [CORE_MAIN=1] [CORE_ADD=2] [SLEEP_TYPE=0] [SLEEP_TIME=10]
 ```
 Note that `VERBOSITY` is not an option more this recipe, because subsequent Python scripts rely on the .csv format given by the default value `VERBOSITY=1`.
 
@@ -76,13 +76,30 @@ Available Python scripts do the following:
 To test the precision of the counter thread (whether there is low/high spread in the number of increments in a given timeframe), `counter_precision_test.sh` is available.
 The command line template is:
 ``` sh
-    analysis/counter_precision_test.sh {0|1|2} [<sleep_time_secs>*<n_repeats>]...
+    analysis/counter_precision_test.sh {0|1|2|3|4} [<sleep_time_secs>*<n_repeats>]...
 ```
 The first argument, between 0 and 2, runs AEXTest either with the sleep out-/inside the enclave (as before with other scripts.) The following arguments tell how long to sleep each run, and how many run with that sleep time will be executed.
-The .csv logs are written in `out/count/count-<timestamp>-{0|1|2}-<sleep_time_secs>-<repeat_id>.csv` files.
+The .csv logs are written in `out/count/count-<timestamp>-{0|1|2|3|4}-<sleep_time_secs>-<repeat_id>.csv` files.
 The format of these files is the same as presented before.
 
-The Python script `plot_count_distributions.py` plots the (cumulative) distributions for given sleeptimes and "in-/out-enclaveness", for each timestamp, i.e., each separate experiment run, using: `plot_count_distributions.py {0|1|2} <sleep_time_secs>`. Output figures are written to `fig/count-<timestamp>-{0|1|2}-<sleep_time_secs>.png` files.
+The Python script `plot_count_distributions.py` plots the (cumulative) distributions for given sleeptimes and "in-/out-enclaveness", for each timestamp, i.e., each separate experiment run, using: `plot_count_distributions.py {0|1|2|3|4} <sleep_time_secs>`. Output figures are written to `fig/count-<timestamp>-{0|1|2|3|4}-<sleep_time_secs>.png` files.
+
+#### Attacking the TSC
+
+Directory `tsc_offsetter` contains a .sh script and a .cpp file to manipulate the TSC on a given core (use `make tsc` to generate the executable from the .cpp file).
+
+To use the .sh script:
+``` sh
+sh tsc_offsetter/tsc_offsetter.sh <target-core> <read-core> {+|-} <offset_secs> [<loop>]
+```
+with `<target-core>` the core number where either the monitored or monitoring counter runs; `<read-core>` the core from which to read the TSC's MSR (Model-Specific Register), which can be the same as or different from `<target-core>` (the difference will be in the number potentially caught AEXs); `{+|-}` whether to apply a positive (go in the future) or negative (go in the past) offset by `<offset_secs>` seconds; `<loop>` whether to continually call `wrmsr` to apply the offset (any non-empty argument will trigger the behaviour.)
+
+To use the executable:
+``` sh
+make tsc
+./tsc <target-core> <read-core> <offset_seconds>
+```
+with `<target-core>` and `<read-core>` the same as before and `<offset_seconds>` a relative integer of how many seconds to offset (negative to go back in time.)
 
 #### Other useful things
 
