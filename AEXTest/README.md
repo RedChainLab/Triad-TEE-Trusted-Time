@@ -76,15 +76,17 @@ Available Python scripts do the following:
 To test the precision of the counter thread (whether there is low/high spread in the number of increments in a given timeframe), `counter_precision_test.sh` is available.
 The command line template is:
 ``` sh
-    analysis/counter_precision_test.sh {0|1|2|3|4} [<sleep_time_secs>*<n_repeats>]...
+    analysis/counter_precision_test.sh <verbosity> <sgx_type>*<sleep_type>*<sleep_time_secs>*<n_repeats>]...
 ```
 The first argument, between 0 and 2, runs AEXTest either with the sleep out-/inside the enclave (as before with other scripts.) The following arguments tell how long to sleep each run, and how many run with that sleep time will be executed.
-The .csv logs are written in `out/count/count-<timestamp>-{0|1|2|3|4}-<sleep_time_secs>-<repeat_id>.csv` files.
+The .csv logs are written in `out/count<verbosity>/count-<timestamp>-<sgx_type>-<sleep_type>-<sleep_time_secs>-<repeat_id>.csv` files.
 The format of these files is the same as presented before.
 
-The Python script `plot_count_distributions.py` plots the (cumulative) distributions for given sleeptimes and "in-/out-enclaveness", for each timestamp, i.e., each separate experiment run, using: `plot_count_distributions.py {0|1|2|3|4} <sleep_time_secs>`. Output figures are written to `fig/count-<timestamp>-{0|1|2|3|4}-<sleep_time_secs>.png` files.
+The Python script `plot_count_distributions.py` plots the (cumulative) distributions for given sleeptimes and "in-/out-enclaveness", for each timestamp, i.e., each separate experiment run, using: `plot_count_distributions.py <sgx_type> <sleep_type> <sleep_time_secs>`. Output figures are written to `fig/count-<timestamp>-<sgx_type>-<sleep_type>-<sleep_time_secs>.png` files.
 
 #### Attacking the TSC
+
+The following require the `msr` module to be loaded (using `sudo modprobe msr`).
 
 Directory `tsc_offsetter` contains a .sh script and a .cpp file to manipulate the TSC on a given core (use `make tsc` to generate the executable from the .cpp file).
 

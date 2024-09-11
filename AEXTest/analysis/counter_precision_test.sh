@@ -2,7 +2,7 @@
 CORE_COUNTER=2
 CORE_MONITOR=3
 
-VERBOSITY=2 # Required value for subsequent scripts
+VERBOSITY=$1 # Required value for subsequent scripts
 
 FILEPATH_PREFIX="out/count${VERBOSITY}/count-`date +%Y-%m-%d-%H-%M-%S`"
 
@@ -32,10 +32,13 @@ sleep_time_to_string()
 
 if test $# = 0
 then
-    echo "Usage: $0 <sleep_type>*<sleep_time>*<repeats>]..."
+    echo "Usage: $0 <verbosity> <sgx_type>*<sleep_type>*<sleep_time>*<repeats>]..."
     exit 1
 fi
-for param
+
+mkdir -p out/count${VERBOSITY} 
+
+for param in `echo $@ | cut -d' ' -f2-`
 do
     sgx_type=`echo $param | cut -d'*' -f1`
     sleep_type=`echo $param | cut -d'*' -f2`
@@ -46,9 +49,9 @@ do
         echo "SGX type must be 1 or 2"
         exit 1
     fi
-    if test $sleep_type -lt 0 || test $sleep_type -gt 3
+    if test $sleep_type -lt 0 || test $sleep_type -gt 4
     then
-        echo "Sleep type must be between 0 and 3"
+        echo "Sleep type must be between 0 and 4"
         exit 1
     fi
     if test $sleep_time -le 0
@@ -65,7 +68,7 @@ do
     for i in $(seq 1 $repeats)
     do
         echo "> `sleep_time_to_string ${sleep_type}`, ${sleep_time}s sleep time, repetition $i"
-        ./app $sgx_type $sleep_time $sleep_type $VERBOSITY $CORE_COUNTER $CORE_MONITOR > $FILEPATH_PREFIX-$sleep_type-$sleep_time-$i.csv
+        ./app $sgx_type $sleep_time $sleep_type $VERBOSITY $CORE_COUNTER $CORE_MONITOR > $FILEPATH_PREFIX-$sgx_type-$sleep_type-$sleep_time-$i.csv
     done
-    echo "Finished generating $FILEPATH_PREFIX-$sleep_type-$sleep_time-*.csv"
+    echo "Finished generating $FILEPATH_PREFIX-$sgx_type-$sleep_type-$sleep_time-*.csv"
 done

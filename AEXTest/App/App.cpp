@@ -290,7 +290,7 @@ void ecall_add_thread(int sgx_type, int set_aff, int core_add)
             ret = loopEReadTSC(global_eid);
             break;
         default:
-            std::cerr << "Error: Invalid SGX type" << std::endl;
+            std::cerr << "Error: Invalid SGX type (expected 1 or 2, got " << sgx_type << ")" << std::endl;
             break;
     }
     if (ret != SGX_SUCCESS)
