@@ -1,4 +1,4 @@
-for file in `ls out/count1/count-*.csv`
+for file in `ls out/count1/count-$2*.csv`
 do
     echo "Processing $file $1"
     python3 analysis/aex_difference.py $file $1

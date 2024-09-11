@@ -73,6 +73,18 @@ void t_print(const char *fmt, ...)
     ocall_print_string(buf);
 }
 
+
+inline void log_aex(long long int* arr, long long int& next_index){
+    if(next_index < SIZE)
+    {
+        arr[next_index++] = add_count;
+    }
+    else
+    {
+        t_print("Error: Array is full\n");
+    }
+}
+
 static void counter_aex_handler(const sgx_exception_info_t *info, const void * args)
 {
     /*
@@ -81,8 +93,7 @@ static void counter_aex_handler(const sgx_exception_info_t *info, const void * a
     */
     (void)info;
     (void)args;
-    count_aex[aex_count] = add_count;
-    aex_count++;
+    log_aex(count_aex, aex_count);
 }
 
 static void monitor_aex_handler(const sgx_exception_info_t *info, const void * args)
@@ -93,8 +104,7 @@ static void monitor_aex_handler(const sgx_exception_info_t *info, const void * a
     */
     (void)info;
     (void)args;
-    monitor_aex[monitor_aex_count] = add_count;
-    monitor_aex_count++;
+    log_aex(monitor_aex, monitor_aex_count);
 }
 
 void printArray(long long int *arr, long long int size, long long int reference){
@@ -226,18 +236,22 @@ void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity){
             {
                 reference = add_count;
             } while(reference == 0);
-            long long int counter = 1500000*sleep_time;
-            __asm__ volatile(
-                "mov %0, %%rcx\n\t"
-                "mov %1, %%rax\n\t"
-                "1: dec %%rax\n\t"
-                "mov %%rax, (%%rcx)\n\t"
-                "test %%rax, %%rax\n\t"
-                "jnz 1b"
-                :
-                : "r"(&counter), "r"(counter)
-                : "rcx", "rax"
-            );
+            for(int i = 0; i < sleep_time; i++)
+            {
+                long long int counter = 3000000;
+                __asm__ volatile(
+                    "mov %0, %%rcx\n\t"
+                    "mov %1, %%rax\n\t"
+                    "1: dec %%rax\n\t"
+                    "mov %%rax, (%%rcx)\n\t"
+                    "test %%rax, %%rax\n\t"
+                    "jnz 1b"
+                    :
+                    : "r"(&counter), "r"(counter)
+                    : "rcx", "rax"
+                );
+                //log_aex(count_aex, aex_count);
+            }
         }
         break;
     }
