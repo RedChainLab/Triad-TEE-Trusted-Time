@@ -6,13 +6,13 @@ all: build
 build: $(SO_PATH) $(APP_NAME)
 
 run: build
-	LD_LIBRARY_PATH=node:$LD_LIBRARY_PATH ./$(APP_NAME)
+	./$(APP_NAME)
 
 $(SO_PATH):
 	cd node && make
 
 $(APP_NAME):
-	g++ -o $(APP_NAME) -Inode -I/opt/intel/sgxsdk/include -I/opt/intel/sgxsdk/include/tlibc -I/opt/intel/sgxsdk/include/libcxx user/main.cpp -Lnode -ltriad
+	g++ -o $(APP_NAME) -Wl,-rpath,node -Inode -I/opt/intel/sgxsdk/include -I/opt/intel/sgxsdk/include/tlibc -I/opt/intel/sgxsdk/include/libcxx user/main.cpp -Lnode -ltriad
 
 clean:
 	rm -f $(APP_NAME)
