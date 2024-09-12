@@ -84,7 +84,7 @@ endif
 App_Cpp_Files := App/App.cpp
 App_Include_Paths := -IApp -I$(SGX_SDK)/include
 
-App_C_Flags := -fPIC -Wno-attributes $(App_Include_Paths)
+App_C_Flags := -fPIC -Wall -Werror -Wno-attributes $(App_Include_Paths)
 
 # Three configuration modes - Debug, prerelease, release
 #   Debug - Macro DEBUG enabled.
@@ -106,7 +106,7 @@ App_Link_Flags := -L$(SGX_LIBRARY_PATH) \
 
 App_Cpp_Objects := $(App_Cpp_Files:.cpp=.o)
 
-App_Name := triad
+App_Name := libtriad.so
 
 ######## Enclave Settings ########
 
@@ -206,7 +206,7 @@ App/%.o: App/%.cpp App/Enclave_u.h
 $(App_Name): App/Enclave_u.o $(App_Cpp_Objects) 
 	@echo "target : $@"
 	@echo "prereq : $^"
-	@$(CXX) $^ -o $@ $(App_Link_Flags)
+	@$(CXX) $^ -shared -Wl,-soname,$@ -o $@ $(App_Link_Flags)
 	@echo "LINK =>  $@"
 
 

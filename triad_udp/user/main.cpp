@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "node.h"
+#include "App/App.h"
 
 int main(int argc, char* argv[]) {
     Node* node = Node::get_instance();

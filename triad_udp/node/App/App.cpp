@@ -7,7 +7,7 @@
 #include "Enclave_u.h"
 
 Node* Node::node = nullptr;
-const char* Node::ENCLAVE_FILE = "enclave.signed.so";
+const char* Node::ENCLAVE_FILE = "node/enclave.signed.so";
 
 /* Global EID shared by multiple threads */
 sgx_enclave_id_t global_eid = 0;
@@ -206,6 +206,7 @@ Node* Node::get_instance()
 {
     if (node == nullptr) 
     {
+        std::cout << "Creating node instance..." << std::endl;
         node = new Node();
         std::cout << "Node instance created: " << node << std::endl;
     }
@@ -223,18 +224,10 @@ void Node::destroy_instance()
         std::cout << "Destroying node instance: " << node << std::endl;
         delete node;
         node = nullptr;
+        std::cout << "Node instance destroyed." << std::endl;
     }
     else
     {
         std::cout << "Node instance does not exist: " << node << std::endl;
     }
-}
-
-int main(int argc, char* argv[]) 
-{
-    Node* node = Node::get_instance();
-    Node::get_instance();
-    Node::destroy_instance();
-    Node::destroy_instance();
-    return 0;
 }
