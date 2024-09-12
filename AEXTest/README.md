@@ -15,6 +15,7 @@ The project makes one thread increment a counter and monitors the number of AEX 
 - For figure generation (you can use `make deps`): 
     - Python3, numpy, pandas, and matplotlib packages
     - Latex packages (e.g., for Ubuntu: `sudo apt-get install dvipng texlive-latex-extra texlive-fonts-recommended cm-super`)
+- The `msr` kernel module is necessary for some monitoring/attacks: use `sudo apt-get install msr-tools`
 
 ## Building AEX Test
 
@@ -104,6 +105,32 @@ make tsc
 with `<target-core>` and `<read-core>` the same as before and `<offset_seconds>` a relative integer of how many seconds to offset (negative to go back in time.)
 
 #### Other useful things
+
+To set the core frequency, use:
+``` sh
+cpupower -c <core-list> frequency-set <MHz-frequency>
+```
+e.g.:
+``` sh
+cpupower -c 2-3 frequency-set 3500
+```
+To see the current frequency with the `cpupower`:
+``` sh
+cpupower -c <core-list> frequency-info
+```
+
+The previous approach does not always seem to take effect. Alternatively, use `wrmsr` on MSR `MSR_IA32_PERF_CTL` (`0x199`):
+``` sh
+modprobe msr
+sudo wrmsr [-p <core-number>] 0x199 0x<MHz-frequency>
+```
+You can read the current core frequency with `MSR_IA32_PERF_STATUS` (`0x198`)
+``` sh
+modprobe msr
+sudo rdmsr [-p <core-number>] 0x198
+```
+The relationship between the value given by MSR 0x198 and the one set in 0x199 seems to be that the last 4 hex characters (8 bytes) represent the frequency.
+Note that even when using one of the CPU frequency steps provided by `cpupower frequency-info` in `wrmsr` commands, it may be ultimately set at some other step. For example, for one tested machine, using available steps lower than 2GHz works, but above or equal to 2GHz it defaults to 3.5GHz.
 
 To watch interrupts on each core over time:
 ``` sh
