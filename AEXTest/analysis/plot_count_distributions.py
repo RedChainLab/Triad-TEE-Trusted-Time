@@ -67,7 +67,10 @@ for timestamp in timestamps:
     ax.grid(True, which='major', linestyle='-')
     ax.grid(True, which='minor', linestyle=':', alpha=0.8)
 
+    rel_error=(agg_df['count'].max()-agg_df['count'].min())/agg_df['count'].mean()
+    ax.legend(labels=["$\\frac{\\Delta x}{\\bar{x}}="+f'{rel_error:2E}$'], loc='center right')
+
     print("mean:",agg_df['count'].mean(),"std:",agg_df['count'].std())
 
-    fig.savefig(f'fig/count-{timestamp}-{sgx_type}-{sleep_type}-{sleep_time_secs}{"-log" if log else ""}.png', bbox_inches='tight')
+    fig.savefig(f'fig/count-{timestamp}-{sgx_type}-{sleep_type}-{sleep_time_secs}{"-log" if log else ""}.png', bbox_inches='tight', dpi=1200)
 
