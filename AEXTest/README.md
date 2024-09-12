@@ -119,7 +119,9 @@ To see the current frequency with the `cpupower`:
 cpupower -c <core-list> frequency-info
 ```
 
-The previous approach does not always seem to take effect. Alternatively, use `wrmsr` on MSR `MSR_IA32_PERF_CTL` (`0x199`):
+The previous approach does not always seem to take effect (seems to either put the min or max core frequency...). 
+
+Alternatively, use `wrmsr` on MSR `MSR_IA32_PERF_CTL` (`0x199`):
 ``` sh
 modprobe msr
 sudo wrmsr [-p <core-number>] 0x199 0x<MHz-frequency>
