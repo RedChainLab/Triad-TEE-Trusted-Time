@@ -236,22 +236,19 @@ void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity){
             {
                 reference = add_count;
             } while(reference == 0);
-            for(int i = 0; i < sleep_time; i++)
-            {
-                long long int counter = 3000000;
-                __asm__ volatile(
-                    "mov %0, %%rcx\n\t"
-                    "mov %1, %%rax\n\t"
-                    "1: dec %%rax\n\t"
-                    "mov %%rax, (%%rcx)\n\t"
-                    "test %%rax, %%rax\n\t"
-                    "jnz 1b"
-                    :
-                    : "r"(&counter), "r"(counter)
-                    : "rcx", "rax"
-                );
-                //log_aex(count_aex, aex_count);
-            }
+            long long int counter = 3000000*sleep_time;
+            __asm__ volatile(
+                "mov %0, %%rcx\n\t"
+                "mov %1, %%rax\n\t"
+                "1: dec %%rax\n\t"
+                "mov %%rax, (%%rcx)\n\t"
+                "test %%rax, %%rax\n\t"
+                "jnz 1b"
+                :
+                : "r"(&counter), "r"(counter)
+                : "rcx", "rax"
+            );
+            //log_aex(count_aex, aex_count);
         }
         break;
     }
