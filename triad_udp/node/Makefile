@@ -182,27 +182,7 @@ else
 all: $(App_Name) $(Signed_Enclave_Name)
 endif
 
-deps:
-	sudo apt-get install -y python3 python3-pip
-	sudo apt-get install -y dvipng texlive-latex-extra texlive-fonts-recommended cm-super
-	pip3 install -r requirements.txt
-
 build: all
-
-run: all
-ifneq ($(Build_Mode), HW_RELEASE)
-	@echo $(CURDIR)/$(App_Name) $(SGX_TYPE) $(SLEEP_TIME) $(SLEEP_TYPE) $(VERBOSITY) $(CORE_MAIN) $(CORE_ADD)
-	@$(CURDIR)/$(App_Name) $(SGX_TYPE) $(SLEEP_TIME) $(SLEEP_TYPE) $(VERBOSITY) $(CORE_MAIN) $(CORE_ADD)
-	@echo "RUN  =>  $(App_Name) [$(SGX_MODE)|$(SGX_ARCH), OK]"
-endif
-
-exp: all
-	@echo $(CURDIR)/$(App_Name) $(SGX_TYPE) $(SLEEP_TIME) $(SLEEP_TYPE) $(VERBOSITY) $(CORE_MAIN) $(CORE_ADD) > $(CURDIR)/$(LOG_FILE)
-	@$(CURDIR)/$(App_Name) $(SGX_TYPE) $(SLEEP_TIME) $(SLEEP_TYPE) $(VERBOSITY) $(CORE_MAIN) $(CORE_ADD) > $(CURDIR)/$(LOG_FILE)
-	@echo "RUN  =>  $(App_Name) [$(SGX_MODE)|$(SGX_ARCH), OK]"
-
-tsc: all
-	g++ -o tsc tsc_offsetter/tsc_offsetter.cpp
 
 ######## App Objects ########
 
