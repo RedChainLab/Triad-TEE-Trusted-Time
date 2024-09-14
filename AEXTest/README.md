@@ -89,7 +89,7 @@ The Python script `plot_count_distributions.py` plots the (cumulative) distribut
 
 The following require the `msr` module to be loaded (using `sudo modprobe msr`).
 
-Directory `tsc_offsetter` contains a .sh script and a .cpp file to manipulate the TSC on a given core (use `make tsc` to generate the executable from the .cpp file).
+Directory `tsc_offsetter` contains a .sh script and a .cpp file to manipulate the TSC (by overwriting `MSR 0x10`) on a given core (use `make tsc` to generate the executable from the .cpp file).
 
 To use the .sh script:
 ``` sh
