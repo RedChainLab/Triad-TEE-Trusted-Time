@@ -290,7 +290,7 @@ void ecall_add_thread(int sgx_type, int set_aff, int core_add)
             ret = loopEReadTSC(global_eid);
             break;
         default:
-            std::cerr << "Error: Invalid SGX type (expected 1 or 2, got " << sgx_type << ")" << std::endl;
+            std::cerr << "Error: Invalid SGX type (expected 1 or 2, but got " << sgx_type << ")" << std::endl;
             break;
     }
     if (ret != SGX_SUCCESS)
@@ -319,9 +319,12 @@ void start_threads(int sgx_type, int sleep_time, int sleep_inside_enclave, int s
     */
     //printf("Info: Starting both threads...  \n");
     std::thread calib(ecall_main_thread, sleep_time, sleep_inside_enclave, verbosity, set_aff, core_main);
-    std::thread add(ecall_add_thread, sgx_type, set_aff, core_add);
+    if(sleep_inside_enclave != 5)
+    {
+        std::thread add(ecall_add_thread, sgx_type, set_aff, core_add);
+        add.join();
+    }
     calib.join();
-    add.join();
 }
 
 
@@ -345,7 +348,7 @@ int SGX_CDECL main(int argc, char *argv[])
     try
     {
         sgx_type = atoi(argv[1]);
-        assert (sgx_type == 1 || sgx_type == 2);
+        assert (sgx_type >= 1 && sgx_type <= 2);
         sleep_time = atoi(argv[2]);
         sleep_inside_enclave = atoi(argv[3]);
         verbosity = atoi(argv[4]);

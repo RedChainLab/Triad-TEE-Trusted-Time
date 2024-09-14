@@ -24,6 +24,9 @@ sleep_time_to_string()
         4)
             echo "asm adder sleep"
             ;;
+        5)
+            echo "self-monitored enclave readTSC sleep"
+            ;;
         *)
             echo "Invalid sleep type"
             ;;
@@ -46,12 +49,12 @@ do
     repeats=`echo $param | cut -d'*' -f4`
     if test $sgx_type -lt 1 || test $sgx_type -gt 2
     then
-        echo "SGX type must be 1 or 2"
+        echo "SGX type between 1 and 2"
         exit 1
     fi
-    if test $sleep_type -lt 0 || test $sleep_type -gt 4
+    if test $sleep_type -lt 0 || test $sleep_type -gt 5
     then
-        echo "Sleep type must be between 0 and 4"
+        echo "Sleep type must be between 0 and 5"
         exit 1
     fi
     if test $sleep_time -le 0

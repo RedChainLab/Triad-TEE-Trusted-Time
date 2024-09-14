@@ -58,7 +58,8 @@ typedef enum {
     O_READTSC_SLEEP = 1,
     E_READTSC_SLEEP = 2,
     C_ADDER_SLEEP = 3,
-    ASM_ADDER_SLEEP = 4
+    ASM_ADDER_SLEEP = 4,
+    SELF_MONITOR = 5
 }sleep_type_t;
 
 cond_struct_t cond = {0, 0, SGX_THREAD_COND_INITIALIZER, SGX_THREAD_MUTEX_INITIALIZER};
@@ -153,7 +154,7 @@ inline long long int rdtsc(void){
     Read the TSC register
     */
     unsigned int lo, hi;
-    __asm__ __volatile__("rdtsc" : "=a" (lo), "=d" (hi));
+    __asm__ __volatile__("rdtscp" : "=a" (lo), "=d" (hi));
     //t_print("lo: %d, hi: %d\n", lo, hi);
     return ((uint64_t)hi << 32) | lo;
 }
@@ -178,12 +179,13 @@ void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity){
     /*
     the main thread that will be called by the application.
     */
-    //see_pid("main_thread");
     cond_struct_t *c = &cond;
     
     const char* args = NULL; 
     sgx_aex_mitigation_node_t node;
-    sgx_register_aex_handler(&node, monitor_aex_handler, (const void*)args);
+    if(sleep_inside_enclave != SELF_MONITOR){
+        sgx_register_aex_handler(&node, monitor_aex_handler, (const void*)args);
+    }
     
     long long int reference = 0;
     c->isCounting = 1;
@@ -251,9 +253,33 @@ void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity){
             //log_aex(count_aex, aex_count);
         }
         break;
+        case SELF_MONITOR:
+        {
+            long long int delta=0;
+            long long int THRESHOLD=600;
+            reference=rdtsc();
+            do{
+                long long int a=rdtsc();
+                do{
+                    add_count=rdtsc();
+                    delta=add_count-a;
+                    a=add_count;
+                } while(add_count-reference<3000000000*sleep_time && delta<THRESHOLD && delta>0);
+                if(delta>=THRESHOLD){
+                    log_aex(monitor_aex, monitor_aex_count);
+                }
+                else if(delta<0){
+                    t_print("Error: non-increasing TSC! delta=%lld\n", delta);
+                    break;
+                }
+            } while(add_count-reference<3000000000*sleep_time);
+        }
+        break;
     }
     c->isCounting = 0;
-    sgx_unregister_aex_handler(monitor_aex_handler);
+    if(sleep_inside_enclave != SELF_MONITOR){
+        sgx_unregister_aex_handler(monitor_aex_handler);
+    }
 
     if(verbosity>=1)
     {
