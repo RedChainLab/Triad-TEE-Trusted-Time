@@ -14,7 +14,6 @@ ssl_client
 *.pdf
 *.png
 client
-server
 tsc
 triad
 **.pem
