@@ -319,7 +319,7 @@ void start_threads(int sgx_type, int sleep_time, int sleep_inside_enclave, int s
     */
     //printf("Info: Starting both threads...  \n");
     std::thread calib(ecall_main_thread, sleep_time, sleep_inside_enclave, verbosity, set_aff, core_main);
-    if(sleep_inside_enclave != 5)
+    if(sleep_inside_enclave < 5 || sleep_inside_enclave > 7)
     {
         std::thread add(ecall_add_thread, sgx_type, set_aff, core_add);
         add.join();

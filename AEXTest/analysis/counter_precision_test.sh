@@ -27,6 +27,12 @@ sleep_time_to_string()
         5)
             echo "self-monitored enclave readTSC sleep"
             ;;
+        6)
+            echo "self-monitored AEX in-enclave counter and rdtscp sleep"
+            ;;
+        7)
+            echo "self-monitored AEX in-enclave asm counter and rdtscp sleep"
+            ;;
         *)
             echo "Invalid sleep type"
             ;;
@@ -43,6 +49,11 @@ mkdir -p out/count${VERBOSITY}
 
 for param in `echo $@ | cut -d' ' -f2-`
 do
+    if test `echo $param | tr -cd '*' | wc -c` -ne 3
+    then
+        echo "Invalid parameter format: $param"
+        exit 1
+    fi
     sgx_type=`echo $param | cut -d'*' -f1`
     sleep_type=`echo $param | cut -d'*' -f2`
     sleep_time=`echo $param | cut -d'*' -f3`
@@ -52,9 +63,9 @@ do
         echo "SGX type between 1 and 2"
         exit 1
     fi
-    if test $sleep_type -lt 0 || test $sleep_type -gt 5
+    if test $sleep_type -lt 0 || test $sleep_type -gt 7
     then
-        echo "Sleep type must be between 0 and 5"
+        echo "Sleep type must be between 0 and 7"
         exit 1
     fi
     if test $sleep_time -le 0

@@ -13,7 +13,8 @@ ssl_client
 *.csv
 *.pdf
 *.png
-client
+mvp_udp/client
+mvp_udp/server
 tsc
 triad
 **.pem

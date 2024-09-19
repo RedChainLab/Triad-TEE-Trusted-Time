@@ -59,7 +59,9 @@ typedef enum {
     E_READTSC_SLEEP = 2,
     C_ADDER_SLEEP = 3,
     ASM_ADDER_SLEEP = 4,
-    SELF_MONITOR = 5
+    SELF_MONITOR = 5,
+    AEX_SELF_MONITOR = 6,
+    AEX_ASM_SELF_MONITOR = 7
 }sleep_type_t;
 
 cond_struct_t cond = {0, 0, SGX_THREAD_COND_INITIALIZER, SGX_THREAD_MUTEX_INITIALIZER};
@@ -184,7 +186,12 @@ void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity){
     const char* args = NULL; 
     sgx_aex_mitigation_node_t node;
     if(sleep_inside_enclave != SELF_MONITOR){
-        sgx_register_aex_handler(&node, monitor_aex_handler, (const void*)args);
+        if(sleep_inside_enclave == AEX_SELF_MONITOR || sleep_inside_enclave == AEX_ASM_SELF_MONITOR){
+            sgx_register_aex_handler(&node, counter_aex_handler, (const void*)args);
+        }
+        else{
+            sgx_register_aex_handler(&node, monitor_aex_handler, (const void*)args);
+        }
     }
     
     long long int reference = 0;
@@ -275,10 +282,51 @@ void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity){
             } while(add_count-reference<3000000000*sleep_time);
         }
         break;
+        case AEX_SELF_MONITOR:
+        {
+            reference=0;
+            long long int start_tsc=rdtsc();
+            long long int stop_tsc=3000000*sleep_time+start_tsc;
+            long long int current_tsc=reference;
+            do{
+                add_count++;
+                current_tsc=rdtsc();
+            } while(current_tsc<stop_tsc);
+        }
+        break;
+        case AEX_ASM_SELF_MONITOR:
+        {
+            reference=0;
+            long long int start_tsc=rdtsc();
+            long long int stop_tsc=3000000*sleep_time+start_tsc;
+            long long int current_tsc=reference;
+            asm volatile(
+                "movq %0, %%r8\n\t"
+                "movq %1, %%r9\n\t"
+                "movq $0, %%r10\n\t"
+
+                "1: rdtsc\n\t"
+                "shlq $32, %%rdx\n\t"
+                "orq %%rax, %%rdx\n\t"
+                "incq %%r10\n\t"
+                "movq %%r10, (%%r8)\n\t"
+                "cmpq %%r9, %%rdx\n\t"
+                "jl 1b\n\t"
+                :
+                : "r"(&add_count), "r"(stop_tsc)
+                : "rax", "rdx", "r8", "r9"
+            );
+        }
+        break;
     }
     c->isCounting = 0;
     if(sleep_inside_enclave != SELF_MONITOR){
-        sgx_unregister_aex_handler(monitor_aex_handler);
+        if(sleep_inside_enclave == AEX_SELF_MONITOR || sleep_inside_enclave == AEX_ASM_SELF_MONITOR){
+            sgx_unregister_aex_handler(counter_aex_handler);
+        }
+        else{
+            sgx_unregister_aex_handler(monitor_aex_handler);
+        }
     }
 
     if(verbosity>=1)
