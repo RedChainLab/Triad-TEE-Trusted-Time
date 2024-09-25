@@ -1,5 +1,5 @@
 APP_NAME=triad
-SO_PATH=node/libtriad.so
+SO_PATH=node/libtriad.so node/enclave.signed.so node/enclave.so
 
 all: build
 

@@ -7,15 +7,18 @@
 
 class Node {
 public:
-    static Node* get_instance();
+    static Node* get_instance(uint16_t port);
     static void destroy_instance();
-    void set_value(int val);
-    int get_value() const;
+    int get_timestamp();
 
 private:
-    Node();
+    uint16_t port;
+    Node(uint16_t _port);
     ~Node();
     int initialize_enclave(const sgx_uswitchless_config_t* us_config);
+    int setup_sockets();
+    int setup_server_socket();
+    int setup_client_socket();
     static Node* node;
     sgx_enclave_id_t enclave_id;
     static const char* ENCLAVE_FILE;

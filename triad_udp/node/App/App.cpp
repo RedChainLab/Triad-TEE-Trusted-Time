@@ -3,6 +3,9 @@
 #include "sgx_urts.h"
 #include "sgx_uswitchless.h"
 #include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include "App.h"
 #include "Enclave_u.h"
 
@@ -174,7 +177,7 @@ void ocall_sleep(int* sec) {
     //printf("Done sleeping outside the enclave\n");
 }
 
-Node::Node() : enclave_id(0) 
+Node::Node(uint16_t _port) : port(_port), enclave_id(0)
 {
     /* Configuration for Switchless SGX */
     sgx_uswitchless_config_t us_config = SGX_USWITCHLESS_CONFIG_INITIALIZER;
@@ -191,6 +194,10 @@ Node::Node() : enclave_id(0)
     {
         std::cout << "SGX enclave initialized: " << enclave_id << std::endl;
     }
+    if(this->setup_sockets() < 0)
+    {
+        std::cerr << "Error: sockets setup failed" << std::endl;
+    }
 }
 
 Node::~Node() 
@@ -202,12 +209,12 @@ Node::~Node()
     }
 }
 
-Node* Node::get_instance()
+Node* Node::get_instance(uint16_t _port)
 {
     if (node == nullptr) 
     {
         std::cout << "Creating node instance..." << std::endl;
-        node = new Node();
+        node = new Node(_port);
         std::cout << "Node instance created: " << node << std::endl;
     }
     else
@@ -230,4 +237,52 @@ void Node::destroy_instance()
     {
         std::cout << "Node instance does not exist: " << node << std::endl;
     }
+}
+
+int Node::get_timestamp()
+{
+    return 0;
+}
+
+int Node::setup_sockets()
+{
+    int serSockDes = setup_server_socket();
+    int cliSockDes = setup_client_socket();
+    return (serSockDes && cliSockDes)?0:-1;
+}
+
+int Node::setup_client_socket()
+{
+    int cliSockDes;
+
+    //create a socket
+    if ((cliSockDes = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        perror("client socket creation error...\n");
+        exit(-1);
+    }
+    return cliSockDes;
+}
+
+int Node::setup_server_socket()
+{
+    int serSockDes;
+    struct sockaddr_in serAddr;
+
+    //creating a new server socket
+    if ((serSockDes = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        perror("server socket creation error...\n");
+        exit(-1);
+    }
+
+    //binding the port to ip and port
+    serAddr.sin_family = AF_INET;
+    serAddr.sin_port = htons(this->port);
+    serAddr.sin_addr.s_addr = INADDR_ANY;
+
+    if ((bind(serSockDes, (struct sockaddr*)&serAddr, sizeof(serAddr))) < 0) {
+        perror("server socket binding error...\n");
+        close(serSockDes);
+        exit(-1);
+    }
+    return serSockDes;
 }
