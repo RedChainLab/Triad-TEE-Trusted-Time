@@ -131,6 +131,28 @@ You can read the current core frequency with `MSR_IA32_PERF_STATUS` (`0x198`)
 modprobe msr
 sudo rdmsr [-p <core-number>] 0x198
 ```
+
+Yet another [approach](https://askubuntu.com/questions/1415288/how-to-install-cpupower-on-ubuntu-20-04-with-kernel-5-17), manipulating the system device files directly (see also [this](https://www.kernel.org/doc/html/latest/admin-guide/pm/cpufreq.html?highlight=schedutil#policy-interface-in-sysfs) and [this](https://www.kernel.org/doc/html/latest/admin-guide/pm/cpufreq.html?highlight=schedutil#generic-scaling-governors)):
+- for the different infos / changeable parameters:
+``` sh
+grep . /sys/devices/system/cpu/cpu0/cpufreq/*
+```
+- setting performance frequency governor
+``` sh
+grep . /sys/devices/system/cpu/cpu*/cpufreq/scaling_available_governors
+echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+```
+- checking available frquencies, the current, min, max frequencies, and setting a min/max frequency:
+``` sh
+grep . /sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies
+sudo grep . /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq
+grep . /sys/devices/system/cpu/cpu*/cpufreq/scaling_min_freq
+grep . /sys/devices/system/cpu/cpu*/cpufreq/scaling_max_freq
+echo 3001000 | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_min_freq
+echo 3001000 | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_max_freq
+```
+
+
 The relationship between the value given by MSR 0x198 and the one set in 0x199 seems to be that the last 4 hex characters (8 bytes) represent the frequency.
 Note that even when using one of the CPU frequency steps provided by `cpupower frequency-info` in `wrmsr` commands, it may be ultimately set at some other step. For example, for one tested machine, using available steps lower than 2GHz works, but above or equal to 2GHz it defaults to 3.5GHz.
 
