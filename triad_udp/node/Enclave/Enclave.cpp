@@ -102,14 +102,13 @@ void incrementNonce(void)
 
 int encrypt(unsigned char* plaintext, unsigned long long plen, unsigned char* ciphertext, unsigned long long clen)
 {
-    unsigned long long ciphertext_len = (unsigned long long)clen;
     unsigned long long decrypted_len;
     unsigned char decrypted[plen + 1];
 
     incrementNonce();
     randombytes_buf(key, sizeof(key));
 
-    crypto_aead_aes256gcm_encrypt((unsigned char*)ciphertext, &ciphertext_len,
+    crypto_aead_aes256gcm_encrypt((unsigned char*)ciphertext, &clen,
                                   (unsigned char*)plaintext, plen,
                                   NULL, 0, NULL, nonce, key);
 }
