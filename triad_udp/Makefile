@@ -12,7 +12,7 @@ $(SO_PATH):
 	cd node && make
 
 $(APP_NAME):
-	g++ -o $(APP_NAME) -Wl,-rpath,node -Inode -I/opt/intel/sgxsdk/include -I/opt/intel/sgxsdk/include/tlibc -I/opt/intel/sgxsdk/include/libcxx user/main.cpp -Lnode -ltriad
+	g++ -o $(APP_NAME) -Wl,-rpath,node -Inode -I/opt/intel/sgxsdk/include user/main.cpp -Lnode -ltriad
 
 clean:
 	rm -f $(APP_NAME)
