@@ -1,15 +1,14 @@
-#include <iostream>
-
-#include "sgx_urts.h"
-#include "sgx_uswitchless.h"
 #include <unistd.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
+#include <cassert>
+#include <map>
+#include <thread>
+
 #include "App.h"
 #include "Enclave_u.h"
 
-Node* Node::node = nullptr;
+std::map<int, Node*> Node::nodes;
 const char* Node::ENCLAVE_FILE = "node/enclave.signed.so";
 
 /* Global EID shared by multiple threads */
@@ -177,7 +176,7 @@ void ocall_sleep(int* sec) {
     //printf("Done sleeping outside the enclave\n");
 }
 
-Node::Node(uint16_t _port) : port(_port), enclave_id(0)
+Node::Node(uint16_t _port) : port(_port), sock(-1), enclave_id(0)
 {
     /* Configuration for Switchless SGX */
     sgx_uswitchless_config_t us_config = SGX_USWITCHLESS_CONFIG_INITIALIZER;
@@ -194,10 +193,13 @@ Node::Node(uint16_t _port) : port(_port), enclave_id(0)
     {
         std::cout << "SGX enclave initialized: " << enclave_id << std::endl;
     }
-    if(this->setup_sockets() < 0)
+    if(!this->setup_socket())
     {
-        std::cerr << "Error: sockets setup failed" << std::endl;
+        std::cerr << "Error: socket setup failed" << std::endl;
     }
+    // launch thread to listen to incoming messages
+    std::thread listenThread(&Node::listen, this);
+    listenThread.detach();
 }
 
 Node::~Node() 
@@ -211,31 +213,31 @@ Node::~Node()
 
 Node* Node::get_instance(uint16_t _port)
 {
-    if (node == nullptr) 
+    if (nodes.find(_port) == nodes.end())
     {
         std::cout << "Creating node instance..." << std::endl;
-        node = new Node(_port);
-        std::cout << "Node instance created: " << node << std::endl;
+        nodes[_port] = new Node(_port);
+        std::cout << "Node instance created: " << nodes[_port] << std::endl;
     }
     else
     {
-        std::cout << "Node instance already exists: " << node << std::endl;
+        std::cout << "Node instance exists: " << nodes[_port] << std::endl;
     }
-    return node;
+    return nodes[_port];
 }
 
-void Node::destroy_instance()
+void Node::destroy_instance(uint16_t _port)
 {
-    if (node != nullptr) 
+    if (!nodes.empty() && nodes.find(_port) != nodes.end())
     {
-        std::cout << "Destroying node instance: " << node << std::endl;
-        delete node;
-        node = nullptr;
+        std::cout << "Destroying node instance: " << nodes[_port] << std::endl;
+        delete nodes[_port];
+        nodes.erase(_port);
         std::cout << "Node instance destroyed." << std::endl;
     }
     else
     {
-        std::cout << "Node instance does not exist: " << node << std::endl;
+        std::cout << "Node instance does not exist. " << std::endl;
     }
 }
 
@@ -244,45 +246,104 @@ int Node::get_timestamp()
     return 0;
 }
 
-int Node::setup_sockets()
+bool Node::setup_socket()
 {
-    int serSockDes = setup_server_socket();
-    int cliSockDes = setup_client_socket();
-    return (serSockDes && cliSockDes)?0:-1;
-}
-
-int Node::setup_client_socket()
-{
-    int cliSockDes;
-
-    //create a socket
-    if ((cliSockDes = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        perror("client socket creation error...\n");
-        exit(-1);
-    }
-    return cliSockDes;
-}
-
-int Node::setup_server_socket()
-{
-    int serSockDes;
-    struct sockaddr_in serAddr;
-
     //creating a new server socket
-    if ((serSockDes = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+    if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         perror("server socket creation error...\n");
         exit(-1);
     }
 
     //binding the port to ip and port
+    struct sockaddr_in serAddr;
     serAddr.sin_family = AF_INET;
     serAddr.sin_port = htons(this->port);
     serAddr.sin_addr.s_addr = INADDR_ANY;
 
-    if ((bind(serSockDes, (struct sockaddr*)&serAddr, sizeof(serAddr))) < 0) {
+    if ((bind(sock, (struct sockaddr*)&serAddr, sizeof(serAddr))) < 0) {
         perror("server socket binding error...\n");
-        close(serSockDes);
+        close(sock);
         exit(-1);
     }
-    return serSockDes;
+    return sock >= 0;
+}
+
+void Node::listen()
+{
+    do
+    {
+        assert(sock >= 0);
+
+        struct sockaddr_in cliAddr;
+        socklen_t cliAddrLen = sizeof(cliAddr);
+        char buff[1024] = {0};
+        ssize_t readStatus = recvfrom(sock, buff, 1024, 0, (struct sockaddr*)&cliAddr, &cliAddrLen);
+        if (readStatus < 0) {
+            perror("reading error...\n");
+            close(sock);
+            exit(-1);
+        }
+
+        std::pair<std::string, uint16_t> cliAddrPair(inet_ntoa(cliAddr.sin_addr), ntohs(cliAddr.sin_port));
+        siblings[cliAddrPair] += 1;
+        std::cout << "Message received from: " << cliAddrPair.first << ":" << cliAddrPair.second << " = " << siblings[cliAddrPair] << std::endl;
+
+        //write but in a string
+        std::string arrivedMsg(buff);
+        if (arrivedMsg.find("Request") != std::string::npos)
+        {
+            std::cout << "Request received from: " << inet_ntoa(cliAddr.sin_addr) << ":" << ntohs(cliAddr.sin_port) << std::endl;
+            //print the message
+
+            char msg[1024] = {0};
+            sprintf(msg, "Response from %d\n", this->port);
+            if (sendto(sock, msg, strlen(msg), 0, (struct sockaddr*)&cliAddr, cliAddrLen) < 0) {
+                perror("sending error...\n");
+                close(sock);
+                exit(-1);
+            }
+        }
+        else
+        {
+            std::cout << "Message received from: " << inet_ntoa(cliAddr.sin_addr) << ":" << ntohs(cliAddr.sin_port) << std::endl;
+            std::cout.write(buff, readStatus);
+        }
+    } while (sock >= 0);
+}
+
+void Node::contactSibling(const char* siblIP, uint16_t siblPort)
+{
+    assert(sock >= 0);
+
+    if (siblings.find(std::pair<std::string, uint16_t>(siblIP, siblPort)) != siblings.end())
+    {
+        std::cout << "Sibling already added: " << siblIP << ":" << siblPort << std::endl;
+        return;
+    }
+
+    struct sockaddr_in serAddr;
+    serAddr.sin_family = AF_INET;
+    serAddr.sin_port = htons(siblPort);
+    serAddr.sin_addr.s_addr = inet_addr(siblIP);
+
+    char msg[1024] = {0};
+    sprintf(msg, "Request to %d\n", siblPort);
+
+    if (sendto(sock, msg, strlen(msg), 0, (struct sockaddr*)&serAddr, sizeof(serAddr)) < 0) {
+        perror("sending error...\n");
+        close(sock);
+        exit(-1);
+    }
+
+    std::pair<std::string, uint16_t> cliAddrPair(siblIP, siblPort);
+    siblings[cliAddrPair] = 0;
+
+}
+
+void Node::printSiblings()
+{
+    for (auto& sibl : siblings)
+    {
+        std::cout << sibl.first.first << ":" << sibl.first.second << " = " << sibl.second << std::endl;
+    }
 }
