@@ -8,6 +8,8 @@
 #include "App.h"
 #include "Enclave_u.h"
 
+#define crypto_aead_aes256gcm_ABYTES    16U
+
 std::map<int, Node*> Node::nodes;
 const char* Node::ENCLAVE_FILE = "node/enclave.signed.so";
 
@@ -198,8 +200,16 @@ Node::Node(uint16_t _port) : port(_port), sock(-1), enclave_id(0)
         std::cerr << "Error: socket setup failed" << std::endl;
     }
     int retval = 0;
-    test_main(enclave_id, &retval);
-    std::cout << "Test main returned: " << retval << std::endl;
+    unsigned char msg[] = "Hello!";
+    unsigned long long msg_len = sizeof(msg);
+    unsigned char ciphertext[sizeof(msg) + crypto_aead_aes256gcm_ABYTES];
+    unsigned long long ciphertext_len = sizeof(ciphertext);
+    unsigned char decrypted[sizeof(msg)];
+    unsigned long long decrypted_len = sizeof(decrypted);
+    encrypt(enclave_id, &retval, msg, msg_len, ciphertext, ciphertext_len);
+    decrypt(enclave_id, &retval, ciphertext, ciphertext_len, decrypted, decrypted_len);
+    std::cout << "D(E(\""<< msg << "\")) = \"" << decrypted << "\"" << std::endl;
+    std::cout << "Test main returned: " << ((retval==0)?"OK":"FAIL") << std::endl;
     // launch thread to listen to incoming messages
     std::thread listenThread(&Node::listen, this);
     listenThread.detach();

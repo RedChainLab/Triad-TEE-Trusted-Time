@@ -28,10 +28,13 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+#include "sodium.h"
 #include "Enclave_t.h"
 #include <stdio.h>
+#include <string>
 #include <sgx_trts_aex.h>
 #include <sgx_thread.h>
+
 #define SIZE 65536
 
 long long int add_count = 0;
@@ -44,6 +47,9 @@ long long int count_aex[SIZE];
 long long int monitor_aex[SIZE];
 
 # define BUFSIZ  8192
+
+unsigned char nonce[crypto_aead_aes256gcm_NPUBBYTES];
+unsigned char key[crypto_aead_aes256gcm_KEYBYTES];
 
 typedef struct {
     int isCounting;
@@ -73,6 +79,52 @@ void printf(const char *fmt, ...)
     ocall_print_string(buf);
 }
 
+void incrementNonce(void)
+{
+    static bool init = false;
+    if(!init)
+    {
+        memset(nonce, 0, sizeof(nonce));
+        init = true;
+    }
+    else
+    {
+        for(int i = 0; i < crypto_aead_aes256gcm_NPUBBYTES; i++)
+        {
+            nonce[i]++;
+            if(nonce[i] != 0)
+            {
+                break;
+            }
+        }
+    }
+}
+
+int encrypt(unsigned char* plaintext, unsigned long long plen, unsigned char* ciphertext, unsigned long long clen)
+{
+    unsigned long long ciphertext_len = (unsigned long long)clen;
+    unsigned long long decrypted_len;
+    unsigned char decrypted[plen + 1];
+
+    incrementNonce();
+    randombytes_buf(key, sizeof(key));
+
+    crypto_aead_aes256gcm_encrypt((unsigned char*)ciphertext, &ciphertext_len,
+                                  (unsigned char*)plaintext, plen,
+                                  NULL, 0, NULL, nonce, key);
+}
+
+int decrypt(unsigned char* ciphertext, unsigned long long clen, unsigned char* decrypted, unsigned long long dlen)
+{
+    unsigned long long decrypted_len;
+    if (crypto_aead_aes256gcm_decrypt(decrypted, &decrypted_len,
+                                      NULL, ciphertext, clen,
+                                      NULL, 0, nonce, key) != 0) {
+        printf("Decryption failed\r\n");
+        return -1;
+    }
+    return 0;
+}
 
 inline void log_aex(long long int* arr, long long int& next_index){
     if(next_index < SIZE)
