@@ -41,6 +41,8 @@ enclave {
         public void countADD(void);
         public void loopEReadTSC(void);
         public void loopOReadTSC(void);
+
+        public int test_main(void);
     };
 
     untrusted {

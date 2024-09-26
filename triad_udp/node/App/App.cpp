@@ -197,6 +197,9 @@ Node::Node(uint16_t _port) : port(_port), sock(-1), enclave_id(0)
     {
         std::cerr << "Error: socket setup failed" << std::endl;
     }
+    int retval = 0;
+    test_main(enclave_id, &retval);
+    std::cout << "Test main returned: " << retval << std::endl;
     // launch thread to listen to incoming messages
     std::thread listenThread(&Node::listen, this);
     listenThread.detach();

@@ -63,7 +63,7 @@ typedef enum {
 
 cond_struct_t cond = {0, 0, SGX_THREAD_COND_INITIALIZER, SGX_THREAD_MUTEX_INITIALIZER};
 
-void t_print(const char *fmt, ...)
+void printf(const char *fmt, ...)
 {
     char buf[BUFSIZ] = {'\0'};
     va_list ap;
@@ -81,7 +81,7 @@ inline void log_aex(long long int* arr, long long int& next_index){
     }
     else
     {
-        t_print("Error: Array is full\n");
+        printf("Error: Array is full\n");
     }
 }
 
@@ -112,7 +112,7 @@ void printArray(long long int *arr, long long int size, long long int reference)
     Print a array of size SIZE, which contains the number of ADD operations performed before each AEX occurs.
     */
     for(int i = 0; i < size ; i++){
-        t_print("%d;%lld\n", i, arr[i]-reference);
+        printf("%d;%lld\n", i, arr[i]-reference);
     }
 }
 
@@ -154,7 +154,7 @@ inline long long int rdtsc(void){
     */
     unsigned int lo, hi;
     __asm__ __volatile__("rdtsc" : "=a" (lo), "=d" (hi));
-    //t_print("lo: %d, hi: %d\n", lo, hi);
+    //printf("lo: %d, hi: %d\n", lo, hi);
     return ((uint64_t)hi << 32) | lo;
 }
 
@@ -260,21 +260,21 @@ void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity){
 
     if(verbosity>=1)
     {
-        t_print("idx;count\n");
+        printf("idx;count\n");
         printArray(count_aex, aex_count, reference);
     }
     if(verbosity>=2)
     {
-        t_print("idx;monitor_aex_count\n");
+        printf("idx;monitor_aex_count\n");
         printArray(monitor_aex, monitor_aex_count, reference);
     }
     if(verbosity==1)
     {
-        t_print("%lld;%lld\n", aex_count, add_count-reference);
+        printf("%lld;%lld\n", aex_count, add_count-reference);
     }
     if(verbosity>=2)
     {
-        t_print("counter_aex_count;monitor_aex_count;final_count\n");
-        t_print("%lld;%lld;%lld\n", aex_count, monitor_aex_count, add_count-reference);
+        printf("counter_aex_count;monitor_aex_count;final_count\n");
+        printf("%lld;%lld;%lld\n", aex_count, monitor_aex_count, add_count-reference);
     }
 }

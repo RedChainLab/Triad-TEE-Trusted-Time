@@ -18,6 +18,7 @@ clean:
 	rm -f $(APP_NAME)
 
 cleanall: clean
+	cd node && make clean
 	rm -f $(SO_PATH)
 
 .PHONY: all build run clean
