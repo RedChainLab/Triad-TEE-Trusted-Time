@@ -113,14 +113,14 @@ void print_error_message(sgx_status_t ret)
     for (idx = 0; idx < ttl; idx++) {
         if(ret == sgx_errlist[idx].err) {
             if(NULL != sgx_errlist[idx].sug)
-                printf("Info: %s\n", sgx_errlist[idx].sug);
-            printf("Error: %s\n", sgx_errlist[idx].msg);
+                printf("Info: %s\r\n", sgx_errlist[idx].sug);
+            printf("Error: %s\r\n", sgx_errlist[idx].msg);
             break;
         }
     }
 
     if (idx == ttl)
-        printf("Error: Unexpected error occurred.\n");
+        printf("Error: Unexpected error occurred.\r\n");
 }
 
 /* Initialize the enclave:
@@ -171,9 +171,9 @@ void ocall_sleep(int* sec) {
     /*
     Sleep for sec seconds outside the enclave
     */
-    //printf("Sleeping for %d seconds outside the enclave...\n", *sec);
+    //printf("Sleeping for %d seconds outside the enclave...\r\n", *sec);
     sleep(*sec);
-    //printf("Done sleeping outside the enclave\n");
+    //printf("Done sleeping outside the enclave\r\n");
 }
 
 Node::Node(uint16_t _port) : port(_port), sock(-1), enclave_id(0)
@@ -250,7 +250,7 @@ bool Node::setup_socket()
 {
     //creating a new server socket
     if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        perror("server socket creation error...\n");
+        perror("server socket creation error...\r\n");
         exit(-1);
     }
 
@@ -261,7 +261,7 @@ bool Node::setup_socket()
     serAddr.sin_addr.s_addr = INADDR_ANY;
 
     if ((bind(sock, (struct sockaddr*)&serAddr, sizeof(serAddr))) < 0) {
-        perror("server socket binding error...\n");
+        perror("server socket binding error...\r\n");
         close(sock);
         exit(-1);
     }
@@ -279,7 +279,7 @@ void Node::listen()
         char buff[1024] = {0};
         ssize_t readStatus = recvfrom(sock, buff, 1024, 0, (struct sockaddr*)&cliAddr, &cliAddrLen);
         if (readStatus < 0) {
-            perror("reading error...\n");
+            perror("reading error...\r\n");
             close(sock);
             exit(-1);
         }
@@ -296,9 +296,9 @@ void Node::listen()
             //print the message
 
             char msg[1024] = {0};
-            sprintf(msg, "Response from %d\n", this->port);
+            sprintf(msg, "Response from %d\r\n", this->port);
             if (sendto(sock, msg, strlen(msg), 0, (struct sockaddr*)&cliAddr, cliAddrLen) < 0) {
-                perror("sending error...\n");
+                perror("sending error...\r\n");
                 close(sock);
                 exit(-1);
             }
@@ -307,6 +307,7 @@ void Node::listen()
         {
             std::cout << "Message received from: " << inet_ntoa(cliAddr.sin_addr) << ":" << ntohs(cliAddr.sin_port) << std::endl;
             std::cout.write(buff, readStatus);
+            //std::cout << std::endl;
         }
     } while (sock >= 0);
 }
@@ -327,10 +328,10 @@ void Node::contactSibling(const char* siblIP, uint16_t siblPort)
     serAddr.sin_addr.s_addr = inet_addr(siblIP);
 
     char msg[1024] = {0};
-    sprintf(msg, "Request to %d\n", siblPort);
+    sprintf(msg, "Request to %d\r\n", siblPort);
 
     if (sendto(sock, msg, strlen(msg), 0, (struct sockaddr*)&serAddr, sizeof(serAddr)) < 0) {
-        perror("sending error...\n");
+        perror("sending error...\r\n");
         close(sock);
         exit(-1);
     }

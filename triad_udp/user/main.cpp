@@ -10,33 +10,21 @@ int main(int argc, char* argv[]) {
 
     uint16_t port = atoi(argv[1]);
     Node* node = Node::get_instance(port);
-    Node* node2 = Node::get_instance(port+1);
     Node::get_instance(port);
-    Node::get_instance(port+1);
-
-    node->contactSibling("127.0.0.1", port+1);
-
     node->get_timestamp();
-    node2->get_timestamp();
-
-    node->printSiblings();
-    node2->printSiblings();
-
-    std::string msg;
-    std::cin >> msg;
 
     for (int i = 2; i < argc; i += 2) {
-        node->contactSibling(argv[i], atoi(argv[i+1]));
-        node2->contactSibling(argv[i], atoi(argv[i+1])+1);
         node->contactSibling(argv[i], atoi(argv[i+1]));
     }
 
     usleep(10000);
 
     node->printSiblings();
-    node2->printSiblings();
 
+    std::string msg;
     std::cin >> msg;
+
+    node->printSiblings();
 
     Node::destroy_instance(port);
     Node::destroy_instance(port+1);
