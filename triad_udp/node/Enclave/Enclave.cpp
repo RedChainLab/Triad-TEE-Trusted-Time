@@ -35,6 +35,7 @@
 #include <string>
 #include <sgx_trts_aex.h>
 #include <sgx_thread.h>
+#include <map>
 
 unsigned char nonce[crypto_aead_aes256gcm_NPUBBYTES];
 unsigned char key[crypto_aead_aes256gcm_KEYBYTES];
@@ -46,16 +47,29 @@ extern "C" {
 void printf(const char *fmt, ...)
 {
     char buf[BUFSIZ] = {'\0'};
-    va_list ap;
-    va_start(ap, fmt);
-    vsnprintf(buf, BUFSIZ, fmt, ap);
-    va_end(ap);
+    // prefix buffer with enclave
+    snprintf(buf, BUFSIZ, "[Enclave]> ");
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf + 11, BUFSIZ - 11, fmt, args);
+    va_end(args);
     ocall_print_string(buf);
 }
 
 #ifdef __cplusplus
 }
 #endif
+
+enum {
+    SUCCESS = 0,
+    SOCKET_ALREADY_EXISTS = -1,
+    SOCKET_CREATION_ERROR = -2,
+    SOCKET_BINDING_ERROR = -3,
+    READING_ERROR = -4,
+    DECRYPTION_FAILED = -5
+}; 
+
+std::map<int /*port*/, int /*socket*/> node_sockets;
 
 void incrementNonce(void)
 {
@@ -103,25 +117,28 @@ int decrypt(unsigned char* ciphertext, unsigned long long clen, unsigned char* d
     return 0;
 }
 
-void sendMessage()
+int test_encdec()
 {
-    int sock;
-    //creating a new server socket
-    if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        printf("server socket creation error...\r\n");
+    unsigned char msg[] = "Hello!";
+    unsigned long long msg_len = sizeof(msg);
+    unsigned char ciphertext[sizeof(msg) + crypto_aead_aes256gcm_ABYTES];
+    unsigned long long ciphertext_len = sizeof(ciphertext);
+    unsigned char decrypted[sizeof(msg)];
+    unsigned long long decrypted_len = sizeof(decrypted);
+    printf("Message: %s\r\n", msg);
+    encrypt(msg, msg_len, ciphertext, ciphertext_len);
+    printf("Encrypted: %s\r\n", ciphertext);
+    if(decrypt(ciphertext, ciphertext_len, decrypted, decrypted_len))
+    {
+        return DECRYPTION_FAILED;
     }
+    printf("Decrypted: %s\r\n", decrypted);
+}
 
-    //binding the port to ip and port
-    struct sockaddr_in serAddr;
-    serAddr.sin_family = AF_INET;
-    serAddr.sin_port = htons(12348);
-    serAddr.sin_addr.s_addr = INADDR_ANY;
-
-    if ((bind(sock, (struct sockaddr*)&serAddr, sizeof(serAddr))) < 0) {
-        printf("server socket binding error...: %d\r\n", errno);
-        close(sock);
-    }
-    printf("server socket created...: %d\r\n", sock);
+int test_recvfrom(int _port)
+{
+    assert(node_sockets.find(_port) != node_sockets.end());
+    int sock = node_sockets[_port];
 
     struct sockaddr_in cliAddr;
     memset(&cliAddr, 0, sizeof(cliAddr)); // Clear the structure
@@ -132,7 +149,58 @@ void sendMessage()
     if (readStatus < 0) {
         printf("reading error...: %d\r\n", errno);
         close(sock);
+        return READING_ERROR;
     } else {
         printf("Message received: %s\r\n", buff);
     }
+    return SUCCESS;
+}
+
+int setup_socket(int port)
+{
+    if(node_sockets.find(port) != node_sockets.end())
+    {
+        printf("Socket already exists...: %d\r\n", node_sockets[port]);
+        return SOCKET_ALREADY_EXISTS;
+    }
+    int sock;
+    //creating a new server socket
+    if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        printf("server socket creation error...\r\n");
+        return SOCKET_CREATION_ERROR;
+    }
+
+    //binding the port to ip and port
+    struct sockaddr_in serAddr;
+    serAddr.sin_family = AF_INET;
+    serAddr.sin_port = htons(port);
+    serAddr.sin_addr.s_addr = INADDR_ANY;
+
+    if ((bind(sock, (struct sockaddr*)&serAddr, sizeof(serAddr))) < 0) {
+        printf("server socket binding error...: %d\r\n", errno);
+        close(sock);
+        return SOCKET_BINDING_ERROR;
+    }
+    printf("server socket created...: %d\r\n", sock);
+    node_sockets[port] = sock;
+    return SUCCESS;
+}
+
+int ecall_init(int _port)
+{
+    printf("Initializing enclave...\r\n");
+    int retval=0;
+    if((retval=setup_socket(_port))!=0)
+    {
+        return retval;
+    }
+    if((retval=test_encdec())!=0)
+    {
+        return retval;
+    }
+    while(retval==0)
+    {
+        retval=test_recvfrom(_port);
+    }
+    return retval;
 }

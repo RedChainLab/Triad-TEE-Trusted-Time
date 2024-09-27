@@ -113,9 +113,9 @@ ssize_t u_recvfrom(int sockfd, void *buf, size_t len, int flags)
     struct sockaddr_in cliAddr;
     socklen_t cliAddrLen = sizeof(cliAddr);
     char buff[1024] = {0};
-    printf("Hey %d, %p, %ld, %d, %p, %p\r\n", sockfd, buf, len, flags, (struct sockaddr*)&cliAddr, &cliAddrLen);
+    printf("[utrst]> %d, %p, %ld, %d, %p, %p\r\n", sockfd, buf, len, flags, (struct sockaddr*)&cliAddr, &cliAddrLen);
     ssize_t ret=recvfrom(sockfd, buf, len, flags, (struct sockaddr*)&cliAddr, &cliAddrLen);
-    printf("ret: %ld\r\n", ret);
+    printf("[utrst]> msg size: %ld\r\n", ret);
     return 0;
 }
 

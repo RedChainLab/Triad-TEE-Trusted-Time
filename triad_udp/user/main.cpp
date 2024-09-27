@@ -13,18 +13,10 @@ int main(int argc, char* argv[]) {
     Node::get_instance(port);
     node->get_timestamp();
 
-    for (int i = 2; i < argc; i += 2) {
-        node->contactSibling(argv[i], atoi(argv[i+1]));
-    }
-
     usleep(10000);
-
-    node->printSiblings();
 
     std::string msg;
     std::cin >> msg;
-
-    node->printSiblings();
 
     Node::destroy_instance(port);
     Node::destroy_instance(port+1);

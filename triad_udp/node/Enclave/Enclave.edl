@@ -38,10 +38,7 @@ enclave {
     from "sgx_socket.edl" import *;
 
     trusted {
-        public int encrypt([in, size=plen] unsigned char * plaintext, unsigned long long plen, [out, size=clen] unsigned char * ciphertext, unsigned long long clen);
-        public int decrypt([in, size=clen] unsigned char * ciphertext, unsigned long long clen, [out, size=dlen] unsigned char * decryptedtext, unsigned long long dlen);
-    
-        public void sendMessage();
+        public int ecall_init(int port);
     };
 
     untrusted {

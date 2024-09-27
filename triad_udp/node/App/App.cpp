@@ -178,7 +178,7 @@ void ocall_sleep(int* sec) {
     //printf("Done sleeping outside the enclave\r\n");
 }
 
-Node::Node(uint16_t _port) : port(_port), sock(-1), enclave_id(0)
+Node::Node(uint16_t _port) : port(_port), enclave_id(0)
 {
     /* Configuration for Switchless SGX */
     sgx_uswitchless_config_t us_config = SGX_USWITCHLESS_CONFIG_INITIALIZER;
@@ -195,25 +195,9 @@ Node::Node(uint16_t _port) : port(_port), sock(-1), enclave_id(0)
     {
         std::cout << "SGX enclave initialized: " << enclave_id << std::endl;
     }
-    if(!this->setup_socket())
-    {
-        std::cerr << "Error: socket setup failed" << std::endl;
-    }
     int retval = 0;
-    unsigned char msg[] = "Hello!";
-    unsigned long long msg_len = sizeof(msg);
-    unsigned char ciphertext[sizeof(msg) + crypto_aead_aes256gcm_ABYTES];
-    unsigned long long ciphertext_len = sizeof(ciphertext);
-    unsigned char decrypted[sizeof(msg)];
-    unsigned long long decrypted_len = sizeof(decrypted);
-    encrypt(enclave_id, &retval, msg, msg_len, ciphertext, ciphertext_len);
-    decrypt(enclave_id, &retval, ciphertext, ciphertext_len, decrypted, decrypted_len);
-    std::cout << "D(E(\""<< msg << "\")) = \"" << decrypted << "\"" << std::endl;
-    std::cout << "Test main returned: " << ((retval==0)?"OK":"FAIL") << std::endl;
-    // launch thread to listen to incoming messages
-    std::thread listenThread(&Node::listen, this);
-    listenThread.detach();
-    sendMessage(enclave_id);
+    std::thread enclave(ecall_init, enclave_id, &retval, _port);
+    enclave.detach();
 }
 
 Node::~Node() 
@@ -260,32 +244,13 @@ int Node::get_timestamp()
     return 0;
 }
 
-bool Node::setup_socket()
+void listen()
 {
-    //creating a new server socket
-    if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        perror("server socket creation error...\r\n");
-        exit(-1);
-    }
-
-    //binding the port to ip and port
-    struct sockaddr_in serAddr;
-    serAddr.sin_family = AF_INET;
-    serAddr.sin_port = htons(this->port);
-    serAddr.sin_addr.s_addr = INADDR_ANY;
-
-    if ((bind(sock, (struct sockaddr*)&serAddr, sizeof(serAddr))) < 0) {
-        perror("server socket binding error...\r\n");
-        close(sock);
-        exit(-1);
-    }
-    return sock >= 0;
-}
-
-void Node::listen()
-{
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    std::map<std::pair<std::string, uint16_t>, int> siblings;
     do
     {
+
         assert(sock >= 0);
 
         struct sockaddr_in cliAddr;
@@ -310,7 +275,7 @@ void Node::listen()
             //print the message
 
             char msg[1024] = {0};
-            sprintf(msg, "Response from %d\r\n", this->port);
+            sprintf(msg, "Response from %d\r\n", 12345);
             if (sendto(sock, msg, strlen(msg), 0, (struct sockaddr*)&cliAddr, cliAddrLen) < 0) {
                 perror("sending error...\r\n");
                 close(sock);
@@ -326,8 +291,10 @@ void Node::listen()
     } while (sock >= 0);
 }
 
-void Node::contactSibling(const char* siblIP, uint16_t siblPort)
+void contactSibling(const char* siblIP, uint16_t siblPort)
 {
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    std::map<std::pair<std::string, uint16_t>, int> siblings;
     assert(sock >= 0);
 
     if (siblings.find(std::pair<std::string, uint16_t>(siblIP, siblPort)) != siblings.end())
@@ -355,8 +322,9 @@ void Node::contactSibling(const char* siblIP, uint16_t siblPort)
 
 }
 
-void Node::printSiblings()
+void printSiblings()
 {
+    std::map<std::pair<std::string, uint16_t>, int> siblings;
     for (auto& sibl : siblings)
     {
         std::cout << sibl.first.first << ":" << sibl.first.second << " = " << sibl.second << std::endl;
