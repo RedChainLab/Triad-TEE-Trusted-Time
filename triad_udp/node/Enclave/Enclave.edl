@@ -38,11 +38,6 @@ enclave {
     from "sgx_socket.edl" import *;
 
     trusted {
-        public void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity);
-        public void countADD(void);
-        public void loopEReadTSC(void);
-        public void loopOReadTSC(void);
-
         public int encrypt([in, size=plen] unsigned char * plaintext, unsigned long long plen, [out, size=clen] unsigned char * ciphertext, unsigned long long clen);
         public int decrypt([in, size=clen] unsigned char * ciphertext, unsigned long long clen, [out, size=dlen] unsigned char * decryptedtext, unsigned long long dlen);
     
