@@ -66,7 +66,8 @@ enum {
     SOCKET_CREATION_ERROR = -2,
     SOCKET_BINDING_ERROR = -3,
     READING_ERROR = -4,
-    DECRYPTION_FAILED = -5
+    DECRYPTION_FAILED = -5,
+    SENDING_ERROR = -6
 }; 
 
 std::map<int /*port*/, int /*socket*/> node_sockets;
@@ -144,14 +145,23 @@ int test_recvfrom(int _port)
     memset(&cliAddr, 0, sizeof(cliAddr)); // Clear the structure
     socklen_t cliAddrLen = sizeof(cliAddr);
     char buff[1024] = {0};
+    char ip[INET_ADDRSTRLEN];
+    int port;
     printf("encl_recvfrom: %d, %p, %d, %d, %p, %p\r\n", sock, buff, sizeof(buff), 0, (struct sockaddr*)&cliAddr, &cliAddrLen);
-    ssize_t readStatus = recvfrom(sock, buff, sizeof(buff), 0);
+    ssize_t readStatus = recvfrom(sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, &port);
+    printf("encl_recvfrom: %d, %p, %d, %d, %s, %d\r\n", sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, port);
     if (readStatus < 0) {
         printf("reading error...: %d\r\n", errno);
         close(sock);
         return READING_ERROR;
     } else {
-        printf("Message received: %s\r\n", buff);
+        printf("Message received from %s:%d: %s\r\n", ip, port, buff);
+    }
+
+    if (sendto(sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, port) < 0) {
+        printf("sending error...: %d\r\n", errno);
+        close(sock);
+        return SENDING_ERROR;
     }
     return SUCCESS;
 }

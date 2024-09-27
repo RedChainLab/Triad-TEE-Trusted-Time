@@ -45,8 +45,8 @@ enclave {
         ssize_t u_send (int fd, [in, size=n] const void *buf, size_t n, int flags) propagate_errno;
         ssize_t u_recv (int fd, [out, size=n] void *buf, size_t n, int flags) propagate_errno;
 
-        ssize_t u_sendto (int fd, [in, size=n] const void *buf, size_t n, int flags, [in, size=addr_len] const struct sockaddr *dest_addr, socklen_t addr_len) propagate_errno;
-        ssize_t u_recvfrom (int fd, [out, size=n] void *buf, size_t n, int flags) propagate_errno transition_using_threads;
+        ssize_t u_sendto (int fd, [in, size=n] const void *buf, size_t n, int flags, [in, size=iplen] char* ip, size_t iplen, int port) propagate_errno transition_using_threads;
+        ssize_t u_recvfrom (int fd, [out, size=n] void *buf, size_t n, int flags, [out, size=iplen] char* ip, size_t iplen, [out] int* port) propagate_errno transition_using_threads;
 
         int u_setsockopt (int fd, int level, int optname, [in, size=optlen] const void *optval, socklen_t optlen) propagate_errno;
         int u_close(int fd) propagate_errno transition_using_threads;
