@@ -29,6 +29,7 @@
  *
  */
 #include "sodium.h"
+#include "sys/socket.h"
 #include "Enclave_t.h"
 #include <stdio.h>
 #include <string>
@@ -69,6 +70,10 @@ typedef enum {
 
 cond_struct_t cond = {0, 0, SGX_THREAD_COND_INITIALIZER, SGX_THREAD_MUTEX_INITIALIZER};
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void printf(const char *fmt, ...)
 {
     char buf[BUFSIZ] = {'\0'};
@@ -78,6 +83,10 @@ void printf(const char *fmt, ...)
     va_end(ap);
     ocall_print_string(buf);
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 void incrementNonce(void)
 {
@@ -113,6 +122,50 @@ int encrypt(unsigned char* plaintext, unsigned long long plen, unsigned char* ci
                                   NULL, 0, NULL, nonce, key);
 }
 
+// Fonction pour convertir une adresse IP en notation pointée en une adresse IP binaire
+uint32_t inet_addr(const char* ip) {
+    uint32_t result = 0;
+    int parts[4] = {0};
+    const char* start = ip;
+
+    for (int i = 0; i < 4; ++i) {
+        parts[i] = 0;
+        while (*start >= '0' && *start <= '9') {
+            parts[i] = parts[i] * 10 + (*start - '0');
+            ++start;
+        }
+        if (*start == '.') {
+            ++start;
+        } else if (i < 3) {
+            return INADDR_NONE; // Adresse invalide
+        }
+    }
+
+    for (int i = 0; i < 4; ++i) {
+        if (parts[i] < 0 || parts[i] > 255) {
+            return INADDR_NONE; // Adresse invalide
+        }
+        result |= (parts[i] << (24 - 8 * i));
+    }
+
+    return result;
+}
+
+// Fonction pour formater une chaîne de caractères sans sprintf
+void format_message(char* buffer, size_t size, const char* format, int value) {
+    const char* fmt = format;
+    char* buf = buffer;
+    while (*fmt && buf < buffer + size - 1) {
+        if (*fmt == '%' && *(fmt + 1) == 'd') {
+            buf += snprintf(buf, buffer + size - buf, "%d", value);
+            fmt += 2;
+        } else {
+            *buf++ = *fmt++;
+        }
+    }
+    *buf = '\0';
+}
+
 int decrypt(unsigned char* ciphertext, unsigned long long clen, unsigned char* decrypted, unsigned long long dlen)
 {
     unsigned long long decrypted_len;
@@ -123,6 +176,40 @@ int decrypt(unsigned char* ciphertext, unsigned long long clen, unsigned char* d
         return -1;
     }
     return 0;
+}
+
+void sendMessage()
+{
+    int sock;
+    //creating a new server socket
+    if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        printf("server socket creation error...\r\n");
+    }
+
+    //binding the port to ip and port
+    struct sockaddr_in serAddr;
+    serAddr.sin_family = AF_INET;
+    serAddr.sin_port = htons(12348);
+    serAddr.sin_addr.s_addr = INADDR_ANY;
+
+    if ((bind(sock, (struct sockaddr*)&serAddr, sizeof(serAddr))) < 0) {
+        printf("server socket binding error...: %d\r\n", errno);
+        close(sock);
+    }
+    printf("server socket created...: %d\r\n", sock);
+
+    struct sockaddr_in cliAddr;
+    memset(&cliAddr, 0, sizeof(cliAddr)); // Clear the structure
+    socklen_t cliAddrLen = sizeof(cliAddr);
+    char buff[1024] = {0};
+    printf("encl_recvfrom: %d, %p, %d, %d, %p, %p\r\n", sock, buff, sizeof(buff), 0, (struct sockaddr*)&cliAddr, &cliAddrLen);
+    ssize_t readStatus = recvfrom(sock, buff, sizeof(buff), 0);
+    if (readStatus < 0) {
+        printf("reading error...: %d\r\n", errno);
+        close(sock);
+    } else {
+        printf("Message received: %s\r\n", buff);
+    }
 }
 
 inline void log_aex(long long int* arr, long long int& next_index){

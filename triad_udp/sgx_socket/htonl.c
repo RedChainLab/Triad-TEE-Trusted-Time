@@ -29,29 +29,11 @@
  *
  */
 
-/* Enclave.edl - Top EDL file. */
+#include <netinet/in.h>
+#include <byteswap.h>
 
-enclave {
-    from "sgx_tstdc.edl" import *;
-    from "sgx_tswitchless.edl" import *;
-    from "sgx_pthread.edl" import *;
-    from "sgx_socket.edl" import *;
-
-    trusted {
-        public void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity);
-        public void countADD(void);
-        public void loopEReadTSC(void);
-        public void loopOReadTSC(void);
-
-        public int encrypt([in, size=plen] unsigned char * plaintext, unsigned long long plen, [out, size=clen] unsigned char * ciphertext, unsigned long long clen);
-        public int decrypt([in, size=clen] unsigned char * ciphertext, unsigned long long clen, [out, size=dlen] unsigned char * decryptedtext, unsigned long long dlen);
-    
-        public void sendMessage();
-    };
-
-    untrusted {
-        void ocall_print_string([in, string] const char *str);
-        void ocall_readTSC([in, out] long long* timestamps);
-        void ocall_sleep([in, out] int* time);
-    };
-};
+uint32_t htonl(uint32_t n)
+{
+	union { int i; char c; } u = { 1 };
+	return u.c ? bswap_32(n) : n;
+}

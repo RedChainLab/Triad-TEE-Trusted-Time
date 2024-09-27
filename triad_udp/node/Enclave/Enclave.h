@@ -40,6 +40,7 @@
 extern "C" {
 #endif
 
+void printf(const char *fmt, ...);
 
 #if defined(__cplusplus)
 }

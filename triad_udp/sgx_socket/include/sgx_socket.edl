@@ -29,29 +29,26 @@
  *
  */
 
-/* Enclave.edl - Top EDL file. */
-
 enclave {
-    from "sgx_tstdc.edl" import *;
-    from "sgx_tswitchless.edl" import *;
-    from "sgx_pthread.edl" import *;
-    from "sgx_socket.edl" import *;
 
-    trusted {
-        public void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity);
-        public void countADD(void);
-        public void loopEReadTSC(void);
-        public void loopOReadTSC(void);
-
-        public int encrypt([in, size=plen] unsigned char * plaintext, unsigned long long plen, [out, size=clen] unsigned char * ciphertext, unsigned long long clen);
-        public int decrypt([in, size=clen] unsigned char * ciphertext, unsigned long long clen, [out, size=dlen] unsigned char * decryptedtext, unsigned long long dlen);
-    
-        public void sendMessage();
-    };
+    include "sys/socket.h"
+    include "sys/select.h"
+    include "netdb.h"
+    include "poll.h"
 
     untrusted {
-        void ocall_print_string([in, string] const char *str);
-        void ocall_readTSC([in, out] long long* timestamps);
-        void ocall_sleep([in, out] int* time);
+        int u_socket (int domain, int type, int protocol) propagate_errno;
+        int u_bind (int fd, [in, size=len] const struct sockaddr *addr, socklen_t len) propagate_errno;
+        int u_listen (int fd, int n) propagate_errno;
+        int u_accept (int fd, [out, size=addrlen_in] struct sockaddr *addr, socklen_t addrlen_in, [out] socklen_t *addrlen_out) propagate_errno;
+        int u_connect (int fd, [in, size=len] const struct sockaddr *addr, socklen_t len) propagate_errno;
+        ssize_t u_send (int fd, [in, size=n] const void *buf, size_t n, int flags) propagate_errno;
+        ssize_t u_recv (int fd, [out, size=n] void *buf, size_t n, int flags) propagate_errno;
+
+        ssize_t u_sendto (int fd, [in, size=n] const void *buf, size_t n, int flags, [in, size=addr_len] const struct sockaddr *dest_addr, socklen_t addr_len) propagate_errno;
+        ssize_t u_recvfrom (int fd, [out, size=n] void *buf, size_t n, int flags) propagate_errno;
+
+        int u_setsockopt (int fd, int level, int optname, [in, size=optlen] const void *optval, socklen_t optlen) propagate_errno;
+        int u_close(int fd);
     };
 };

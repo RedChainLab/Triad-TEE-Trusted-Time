@@ -213,6 +213,7 @@ Node::Node(uint16_t _port) : port(_port), sock(-1), enclave_id(0)
     // launch thread to listen to incoming messages
     std::thread listenThread(&Node::listen, this);
     listenThread.detach();
+    sendMessage(enclave_id);
 }
 
 Node::~Node() 
