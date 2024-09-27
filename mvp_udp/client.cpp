@@ -8,13 +8,19 @@
 #include <unistd.h>
 using namespace std;
 
-#define PORT 8080
-
 int main(int argc, char** argv) {
+
+  if(argc != 3) {
+    cout << "Usage: " << argv[0] << " <port> <msg>" << endl;
+    return -1;
+  }
+  int port = atoi(argv[1]);
+
   int cliSockDes, readStatus;
   struct sockaddr_in serAddr;
   socklen_t serAddrLen;
-  char msg[] = "Hello!!!\n";
+  char msg[1024]={"\0"};
+  memcpy(msg, argv[2], strlen(argv[2]));
   char buff[1024] = {0};
 
   //create a socket
@@ -25,7 +31,7 @@ int main(int argc, char** argv) {
 
   //server socket address
   serAddr.sin_family = AF_INET;
-  serAddr.sin_port = htons(PORT);
+  serAddr.sin_port = htons(port);
   serAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
   if (sendto(cliSockDes, msg, strlen(msg), 0, (struct sockaddr*)&serAddr, sizeof(serAddr)) < 0) {
