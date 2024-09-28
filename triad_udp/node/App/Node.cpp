@@ -189,13 +189,13 @@ Node::~Node()
 {
     std::cout << getPrefix() << "Destroying node instance..." << std::endl;
     std::cout << getPrefix() << "Signalling to stop..." << std::endl;
-
     int retvalue = 0;
     sgx_status_t ret = ecall_stop(enclave_id, &retvalue, port);
     if (ret != SGX_SUCCESS) 
     {
         print_error_message(ret);
     }
+    std::cout << getPrefix() << "ENode destroyed." << std::endl;
     std::cout << getPrefix() << "Joining threads..." << std::endl;
     for(auto& thread : this->threads)
     {
@@ -234,6 +234,7 @@ int Node::initialize_enclave(const sgx_uswitchless_config_t* us_config)
 
 Node* Node::get_instance(uint16_t _port)
 {
+    std::cout << NODE_MGR << "Trying to create node with port "<< _port << "..." << std::endl;
     if (nodes.find(_port) == nodes.end())
     {
         std::cout << NODE_MGR << "Creating node instance..." << std::endl;
@@ -249,6 +250,7 @@ Node* Node::get_instance(uint16_t _port)
 
 void Node::destroy_instance(uint16_t _port)
 {
+    std::cout << NODE_MGR << "Trying to destroy node with port " << _port << "..." << std::endl;
     if (!nodes.empty() && nodes.find(_port) != nodes.end())
     {
         std::cout << NODE_MGR << "Destroying node instance: " << nodes[_port] << std::endl;
@@ -258,7 +260,7 @@ void Node::destroy_instance(uint16_t _port)
     }
     else
     {
-        std::cout << NODE_MGR << "Node instance does not exist. " << std::endl;
+        std::cout << NODE_MGR << "Node instance does not exist." << std::endl;
     }
 }
 

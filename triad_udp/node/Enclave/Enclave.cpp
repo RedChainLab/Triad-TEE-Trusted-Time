@@ -145,7 +145,7 @@ ENode::~ENode()
     sgx_thread_rwlock_unlock(&mutex);
     sgx_thread_rwlock_destroy(&mutex);
     close(sock);
-    eprintf("Node instance destroyed...\r\n");
+    eprintf("Node instance destroyed.\r\n");
 }
 
 int ENode::test_pong_ping()
@@ -271,7 +271,7 @@ int ecall_init(int _port)
     printf("%sInitializing enclave...\r\n", ENCLAVE_MGR);
     if(nodes.find(_port) != nodes.end())
     {
-        printf("%sNode already exists...\r\n", ENCLAVE_MGR);
+        printf("%sNode already exists.\r\n", ENCLAVE_MGR);
         return SOCKET_ALREADY_EXISTS;
     }
     nodes.emplace(_port, new ENode(_port));
@@ -283,24 +283,25 @@ int ecall_stop(int _port)
     printf("%sStopping enclave...\r\n", ENCLAVE_MGR);
     if(nodes.find(_port) == nodes.end())
     {
-        printf("%sNode does not exist...\r\n", ENCLAVE_MGR);
+        printf("%sNode does not exist.\r\n", ENCLAVE_MGR);
         return SOCKET_ALREADY_EXISTS;
     }
     delete nodes[_port];
     nodes.erase(_port);
-    printf("%sEnclave stopped...\r\n", ENCLAVE_MGR);
+    printf("%sEnclave stopped.\r\n", ENCLAVE_MGR);
     return SUCCESS;
 }
 
 int ecall_start(int _port)
 {
+    printf("%sStarting enclave logic...\r\n", ENCLAVE_MGR);
     if(nodes.find(_port) == nodes.end())
     {
         printf("%sNode does not exist...\r\n", ENCLAVE_MGR);
         return SOCKET_ALREADY_EXISTS;
     }
-    printf("%sStarting enclave logic...\r\n", ENCLAVE_MGR);
     nodes[_port]->test();
+    printf("%sEnclave logic started.\r\n", ENCLAVE_MGR);
     return SUCCESS;
 }
 
