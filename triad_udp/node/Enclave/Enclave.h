@@ -45,8 +45,6 @@
 extern "C" {
 #endif
 
-void printf(const char *fmt, ...);
-
 #if defined(__cplusplus)
 }
 #endif
@@ -71,11 +69,11 @@ public:
     int port;
     bool stop;
 
-    long long int add_count = 0;
-    long long int tsc = 0;
+    long long int add_count;
+    long long int tsc;
 
-    long long int aex_count = 0;
-    long long int monitor_aex_count = 0;
+    long long int aex_count;
+    long long int monitor_aex_count;
 
     long long int count_aex[SIZE];
     long long int monitor_aex[SIZE];

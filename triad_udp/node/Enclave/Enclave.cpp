@@ -41,7 +41,7 @@
 extern "C" {
 #endif
 
-void printf(const char *fmt, ...)
+static void printf(const char *fmt, ...)
 {
     char buf[BUFSIZ] = {'\0'};
     va_list args;
@@ -81,6 +81,15 @@ typedef enum {
 
 std::map<int /*port*/, ENode*> nodes;
 
+static void printArray(long long int *arr, long long int size, long long int reference){
+    /*
+    Print a array of size SIZE, which contains the number of ADD operations performed before each AEX occurs.
+    */
+    for(int i = 0; i < size ; i++){
+        printf("%d;%lld\n", i, arr[i]-reference);
+    }
+}
+
 inline void log_aex(long long int* arr, long long int& next_index, long long int* add_count){
     if(next_index < SIZE)
     {
@@ -92,7 +101,7 @@ inline void log_aex(long long int* arr, long long int& next_index, long long int
     }
 }
 
-void counter_aex_handler(const sgx_exception_info_t *info, const void * args)
+static void counter_aex_handler(const sgx_exception_info_t *info, const void * args)
 {
     /*
     a custom handler that will be called when an AEX occurs, storing the number of ADD operations (performed in another thread) in a global array. This allows you to 
@@ -104,7 +113,7 @@ void counter_aex_handler(const sgx_exception_info_t *info, const void * args)
     log_aex(aex_args->count_aex, *(aex_args->aex_count), aex_args->add_count);
 }
 
-void monitor_aex_handler(const sgx_exception_info_t *info, const void * args)
+static void monitor_aex_handler(const sgx_exception_info_t *info, const void * args)
 {
     /*
     a custom handler that will be called when an AEX occurs, storing the number of ADD operations (performed in another thread) in a global array. This allows you to 
@@ -114,6 +123,16 @@ void monitor_aex_handler(const sgx_exception_info_t *info, const void * args)
     aex_handler_args_t* aex_args = (aex_handler_args_t*)args;
     printf("AEX %d %d\r\n", aex_args->port, *aex_args->stop);
     log_aex(aex_args->monitor_aex, *(aex_args->monitor_aex_count), aex_args->add_count);
+}
+
+inline long long int rdtsc(void){
+    /*
+    Read the TSC register
+    */
+    unsigned int lo, hi;
+    __asm__ __volatile__("rdtscp" : "=a" (lo), "=d" (hi));
+    //t_print("lo: %d, hi: %d\n", lo, hi);
+    return ((uint64_t)hi << 32) | lo;
 }
 
 void ENode::countAdd(void){
@@ -146,16 +165,6 @@ void ENode::loopOReadTSC(void){
     sgx_unregister_aex_handler(counter_aex_handler);
 }
 
-inline long long int rdtsc(void){
-    /*
-    Read the TSC register
-    */
-    unsigned int lo, hi;
-    __asm__ __volatile__("rdtscp" : "=a" (lo), "=d" (hi));
-    //t_print("lo: %d, hi: %d\n", lo, hi);
-    return ((uint64_t)hi << 32) | lo;
-}
-
 void ENode::loopEReadTSC(void){
     /*
     The function that will be called in another thread to perform ADD operations.
@@ -171,13 +180,56 @@ void ENode::loopEReadTSC(void){
     sgx_unregister_aex_handler(counter_aex_handler);
 }
 
-void printArray(long long int *arr, long long int size, long long int reference){
-    /*
-    Print a array of size SIZE, which contains the number of ADD operations performed before each AEX occurs.
-    */
-    for(int i = 0; i < size ; i++){
-        printf("%d;%lld\n", i, arr[i]-reference);
-    }
+ENode::ENode(int _port):port(_port), stop(false), sock(-1), isCounting(false), add_count(0), aex_count(0), monitor_aex_count(0)
+{
+    eprintf("Creating ENode instance...\r\n");
+    memset(count_aex, 0, sizeof(count_aex));
+    memset(monitor_aex, 0, sizeof(monitor_aex));
+
+    aex_args.stop = &stop;
+    aex_args.port = port;
+    aex_args.add_count = &add_count;
+
+    sgx_thread_rwlock_init(&stop_rwlock, NULL);
+    sgx_thread_rwlock_init(&socket_rwlock, NULL);
+    setup_socket();
+    test_encdec();
+    eprintf("ENode instance created.\r\n");
+}
+
+ENode::~ENode()
+{
+    eprintf("Destroying ENode instance...\r\n");
+    print_siblings();
+    sgx_thread_rwlock_wrlock(&stop_rwlock);
+    stop=true;
+    sgx_thread_rwlock_unlock(&stop_rwlock);
+    sgx_thread_rwlock_destroy(&stop_rwlock);
+    sgx_thread_rwlock_wrlock(&socket_rwlock);
+    close(sock);
+    sgx_thread_rwlock_unlock(&socket_rwlock);
+    sgx_thread_rwlock_destroy(&socket_rwlock);
+    eprintf("ENode instance destroyed.\r\n");
+}
+
+void ENode::eprintf(const char *fmt, ...)
+{
+    char buf[BUFSIZ] = {'\0'};
+    std::string str = std::string("[ENode ") + std::to_string(port) + "]> ";
+    str += fmt;
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf, BUFSIZ, str.c_str(), args);
+    va_end(args);
+    ocall_print_string(buf);
+}
+
+bool ENode::should_stop()
+{
+    sgx_thread_rwlock_rdlock(&stop_rwlock);
+    bool retval = stop;
+    sgx_thread_rwlock_unlock(&stop_rwlock);
+    return retval;
 }
 
 void ENode::incrementNonce(void)
@@ -243,36 +295,34 @@ int ENode::test_encdec()
     return SUCCESS;
 }
 
-ENode::ENode(int _port):port(_port), stop(false), sock(-1), isCounting(false), add_count(0), aex_count(0), monitor_aex_count(0)
+int ENode::setup_socket()
 {
-    eprintf("Creating ENode instance...\r\n");
-    memset(count_aex, 0, sizeof(count_aex));
-    memset(monitor_aex, 0, sizeof(monitor_aex));
-
-    aex_args.stop = &stop;
-    aex_args.port = port;
-    aex_args.add_count = &add_count;
-
-    sgx_thread_rwlock_init(&stop_rwlock, NULL);
-    sgx_thread_rwlock_init(&socket_rwlock, NULL);
-    setup_socket();
-    test_encdec();
-    eprintf("ENode instance created.\r\n");
-}
-
-ENode::~ENode()
-{
-    eprintf("Destroying ENode instance...\r\n");
-    print_siblings();
-    sgx_thread_rwlock_wrlock(&stop_rwlock);
-    stop=true;
-    sgx_thread_rwlock_unlock(&stop_rwlock);
-    sgx_thread_rwlock_destroy(&stop_rwlock);
     sgx_thread_rwlock_wrlock(&socket_rwlock);
-    close(sock);
+    //creating a new server socket
+    if ((this->sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        eprintf("server socket creation error...\r\n");
+        return SOCKET_CREATION_ERROR;
+    }
+
+    //binding the port to ip and port
+    struct sockaddr_in serAddr;
+    serAddr.sin_family = AF_INET;
+    serAddr.sin_port = htons((int16_t)port);
+    serAddr.sin_addr.s_addr = INADDR_ANY;
+
+    if ((bind(this->sock, (struct sockaddr*)&serAddr, sizeof(serAddr))) < 0) {
+        eprintf("server socket binding error...: %d\r\n", errno);
+        close(this->sock);
+        return SOCKET_BINDING_ERROR;
+    }
+
+    struct timeval read_timeout;
+    read_timeout.tv_sec = 0;
+    read_timeout.tv_usec = 100;
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &read_timeout, sizeof(read_timeout));
     sgx_thread_rwlock_unlock(&socket_rwlock);
-    sgx_thread_rwlock_destroy(&socket_rwlock);
-    eprintf("ENode instance destroyed.\r\n");
+    eprintf("server socket created...: %d\r\n", this->sock);
+    return SUCCESS;
 }
 
 int ENode::test_pong_ping()
@@ -300,14 +350,6 @@ int ENode::test_pong_ping()
         return SENDING_ERROR;
     }
     return SUCCESS;
-}
-
-bool ENode::should_stop()
-{
-    sgx_thread_rwlock_rdlock(&stop_rwlock);
-    bool retval = stop;
-    sgx_thread_rwlock_unlock(&stop_rwlock);
-    return retval;
 }
 
 int ENode::loop_recvfrom()
@@ -355,6 +397,7 @@ int ENode::handle_message(char* buff, char* ip, uint16_t cport)
         if(std::find(siblings.begin(), siblings.end(), std::make_pair(std::string(ip), cport)) == siblings.end())
         {
             siblings.emplace_back(ip, cport);
+            eprintf("Sibling added.\r\n");
         }
         else
         {
@@ -381,125 +424,6 @@ int ENode::handle_message(char* buff, char* ip, uint16_t cport)
     }
     return SUCCESS;
 }
-
-int ENode::setup_socket()
-{
-    sgx_thread_rwlock_wrlock(&socket_rwlock);
-    //creating a new server socket
-    if ((this->sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        eprintf("server socket creation error...\r\n");
-        return SOCKET_CREATION_ERROR;
-    }
-
-    //binding the port to ip and port
-    struct sockaddr_in serAddr;
-    serAddr.sin_family = AF_INET;
-    serAddr.sin_port = htons((int16_t)port);
-    serAddr.sin_addr.s_addr = INADDR_ANY;
-
-    if ((bind(this->sock, (struct sockaddr*)&serAddr, sizeof(serAddr))) < 0) {
-        eprintf("server socket binding error...: %d\r\n", errno);
-        close(this->sock);
-        return SOCKET_BINDING_ERROR;
-    }
-
-    struct timeval read_timeout;
-    read_timeout.tv_sec = 0;
-    read_timeout.tv_usec = 100;
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &read_timeout, sizeof(read_timeout));
-    sgx_thread_rwlock_unlock(&socket_rwlock);
-    eprintf("server socket created...: %d\r\n", this->sock);
-    return SUCCESS;
-}
-
-void ENode::eprintf(const char *fmt, ...)
-{
-    char buf[BUFSIZ] = {'\0'};
-    std::string str = std::string("[ENode ") + std::to_string(port) + "]> ";
-    str += fmt;
-    va_list args;
-    va_start(args, fmt);
-    vsnprintf(buf, BUFSIZ, str.c_str(), args);
-    va_end(args);
-    ocall_print_string(buf);
-}
-
-int ecall_init(uint16_t _port)
-{
-    printf("%sInitializing enclave node...\r\n", ENCLAVE_MGR);
-    if(nodes.find(_port) != nodes.end())
-    {
-        printf("%sNode already exists.\r\n", ENCLAVE_MGR);
-        return SOCKET_ALREADY_EXISTS;
-    }
-    printf("%sNode does not exist yet. Creating...\r\n", ENCLAVE_MGR);
-    nodes.emplace(_port, new ENode(_port));
-    return SUCCESS;
-}
-
-int ecall_stop(uint16_t _port)
-{
-    printf("%sStopping enclave...\r\n", ENCLAVE_MGR);
-    if(nodes.find(_port) == nodes.end())
-    {
-        printf("%sNode does not exist.\r\n", ENCLAVE_MGR);
-        return SOCKET_ALREADY_EXISTS;
-    }
-    delete nodes[_port];
-    nodes.erase(_port);
-    printf("%sEnclave stopped.\r\n", ENCLAVE_MGR);
-    return SUCCESS;
-}
-
-int ecall_start(uint16_t _port)
-{
-    printf("%sStarting enclave logic...\r\n", ENCLAVE_MGR);
-    if(nodes.find(_port) == nodes.end())
-    {
-        printf("%sNode does not exist...\r\n", ENCLAVE_MGR);
-        return SOCKET_ALREADY_EXISTS;
-    }
-    nodes[_port]->test();
-    printf("%sEnclave logic started.\r\n", ENCLAVE_MGR);
-    return SUCCESS;
-}
-
-int ecall_add_sibling(uint16_t _port, const char* hostname, uint16_t port)
-{
-    printf("%sAdding sibling at %s:%d to node at %d...\r\n", ENCLAVE_MGR, hostname, port, _port);
-    if(nodes.find(_port) == nodes.end())
-    {
-        printf("%sNode at %d does not exist...\r\n", ENCLAVE_MGR, _port);
-        return SOCKET_ALREADY_EXISTS;
-    }
-    nodes[_port]->add_sibling(std::string(hostname), port);
-    printf("%sSibling at %s:%d added to node at %d.\r\n", ENCLAVE_MGR, hostname, port, _port);
-    return SUCCESS;
-}
-
-void ENode::test()
-{
-    loop_recvfrom();
-}
-
-int ENode::add_sibling(std::string hostname, uint16_t _port)
-{
-    eprintf("Adding sibling %s:%d to node...\r\n", hostname, _port);
-    siblings.emplace_back(hostname, _port);
-
-    const char* buff = "Sibling";
-    //eprintf("sento: %d, %s, %d, %d, %s, %d\r\n", sock, buff, sizeof(buff), 0, hostname.c_str(), _port);
-    ssize_t sendStatus = sendto(sock, buff, sizeof(buff), 0, hostname.c_str(), INET_ADDRSTRLEN, _port);
-    if (sendStatus< 0) {
-        eprintf("sending error...: %d\r\n", errno);
-        sgx_thread_rwlock_wrlock(&socket_rwlock);
-        close(sock);
-        sgx_thread_rwlock_unlock(&socket_rwlock);
-        return SENDING_ERROR;
-    }
-    return SUCCESS;
-}
-
 void ENode::print_siblings()
 {
     eprintf("%d siblings: ", siblings.size());
@@ -677,4 +601,85 @@ void ENode::monitor(int sleep_time, int sleep_inside_enclave, int verbosity){
         printf("counter_aex_count;monitor_aex_count;final_count\n");
         printf("%lld;%lld;%lld\n", aex_count, monitor_aex_count, add_count-reference);
     }
+}
+
+int ENode::add_sibling(std::string hostname, uint16_t _port)
+{
+    eprintf("Adding sibling %s:%d to node...\r\n", hostname, _port);
+    if(std::find(siblings.begin(), siblings.end(), std::make_pair(hostname, _port)) != siblings.end())
+    {
+        eprintf("Sibling already added.\r\n");
+        return SUCCESS;
+    }
+    siblings.emplace_back(hostname, _port);
+    eprintf("Sibling added.\r\n");
+    const char* buff = "Sibling";
+    //eprintf("sento: %d, %s, %d, %d, %s, %d\r\n", sock, buff, sizeof(buff), 0, hostname.c_str(), _port);
+    ssize_t sendStatus = sendto(sock, buff, sizeof(buff), 0, hostname.c_str(), INET_ADDRSTRLEN, _port);
+    if (sendStatus< 0) {
+        eprintf("sending error...: %d\r\n", errno);
+        sgx_thread_rwlock_wrlock(&socket_rwlock);
+        close(sock);
+        sgx_thread_rwlock_unlock(&socket_rwlock);
+        return SENDING_ERROR;
+    }
+    return SUCCESS;
+}
+
+void ENode::test()
+{
+    loop_recvfrom();
+}
+
+int ecall_init(uint16_t _port)
+{
+    printf("%sInitializing enclave node...\r\n", ENCLAVE_MGR);
+    if(nodes.find(_port) != nodes.end())
+    {
+        printf("%sNode already exists.\r\n", ENCLAVE_MGR);
+        return SOCKET_ALREADY_EXISTS;
+    }
+    printf("%sNode does not exist yet. Creating...\r\n", ENCLAVE_MGR);
+    nodes.emplace(_port, new ENode(_port));
+    return SUCCESS;
+}
+
+int ecall_stop(uint16_t _port)
+{
+    printf("%sStopping enclave...\r\n", ENCLAVE_MGR);
+    if(nodes.find(_port) == nodes.end())
+    {
+        printf("%sNode does not exist.\r\n", ENCLAVE_MGR);
+        return SOCKET_ALREADY_EXISTS;
+    }
+    delete nodes[_port];
+    nodes.erase(_port);
+    printf("%sEnclave stopped.\r\n", ENCLAVE_MGR);
+    return SUCCESS;
+}
+
+int ecall_start(uint16_t _port)
+{
+    printf("%sStarting enclave logic...\r\n", ENCLAVE_MGR);
+    if(nodes.find(_port) == nodes.end())
+    {
+        printf("%sNode does not exist...\r\n", ENCLAVE_MGR);
+        return SOCKET_ALREADY_EXISTS;
+    }
+    nodes[_port]->test();
+    printf("%sEnclave logic started.\r\n", ENCLAVE_MGR);
+    return SUCCESS;
+}
+
+int ecall_add_sibling(uint16_t _port, const char* hostname, uint16_t port)
+{
+    printf("%sAdding sibling at %s:%d to node at %d...\r\n", ENCLAVE_MGR, hostname, port, _port);
+    if(nodes.find(_port) == nodes.end())
+    {
+        printf("%sNode at %d does not exist...\r\n", ENCLAVE_MGR, _port);
+        return SOCKET_ALREADY_EXISTS;
+    }
+    nodes[_port]->add_sibling(std::string(hostname), port);
+    printf("%sSibling at %s:%d added to node at %d.\r\n", ENCLAVE_MGR, hostname, port, _port);
+    return SUCCESS;
 }
