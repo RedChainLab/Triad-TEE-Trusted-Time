@@ -81,7 +81,7 @@ else
 	Urts_Library_Name := sgx_urts
 endif
 
-App_Cpp_Files := App/Node.cpp ../sgx_socket/untrusted_sgx_socket.cpp
+App_Cpp_Files := App/Node.cpp App/ocalls.cpp ../sgx_socket/untrusted_sgx_socket.cpp
 App_Include_Paths := -IApp -I$(SGX_SDK)/include
 
 App_C_Flags := $(SGX_COMMON_CFLAGS) -fPIC -Wall -Werror -Wno-attributes $(App_Include_Paths)
