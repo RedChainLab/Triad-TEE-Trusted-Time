@@ -14,11 +14,10 @@ int main(int argc, char* argv[]) {
     node->get_timestamp();
 
     usleep(10000);
-
+    std::cout << "<Enter anything to continue>"<< std::endl;
     std::string msg;
     std::cin >> msg;
-
     Node::destroy_instance(port);
-    Node::destroy_instance(port+1);
+    Node::destroy_instance(port);
     return 0;
 }

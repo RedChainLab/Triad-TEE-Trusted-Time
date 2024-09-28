@@ -28,17 +28,14 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#include "sodium.h"
 #include "sys/socket.h"
 #include "Enclave_t.h"
+#include "Enclave.h"
 #include <stdio.h>
 #include <string>
 #include <sgx_trts_aex.h>
 #include <sgx_thread.h>
 #include <map>
-
-unsigned char nonce[crypto_aead_aes256gcm_NPUBBYTES];
-unsigned char key[crypto_aead_aes256gcm_KEYBYTES];
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,11 +44,9 @@ extern "C" {
 void printf(const char *fmt, ...)
 {
     char buf[BUFSIZ] = {'\0'};
-    // prefix buffer with enclave
-    snprintf(buf, BUFSIZ, "[Enclave]> ");
     va_list args;
     va_start(args, fmt);
-    vsnprintf(buf + 11, BUFSIZ - 11, fmt, args);
+    vsnprintf(buf, BUFSIZ, fmt, args);
     va_end(args);
     ocall_print_string(buf);
 }
@@ -70,9 +65,9 @@ enum {
     SENDING_ERROR = -6
 }; 
 
-std::map<int /*port*/, int /*socket*/> node_sockets;
+std::map<int /*port*/, ENode> nodes;
 
-void incrementNonce(void)
+void ENode::incrementNonce(void)
 {
     static bool init = false;
     if(!init)
@@ -93,7 +88,7 @@ void incrementNonce(void)
     }
 }
 
-int encrypt(unsigned char* plaintext, unsigned long long plen, unsigned char* ciphertext, unsigned long long clen)
+int ENode::encrypt(unsigned char* plaintext, unsigned long long plen, unsigned char* ciphertext, unsigned long long clen)
 {
     unsigned long long decrypted_len;
     unsigned char decrypted[plen + 1];
@@ -106,19 +101,19 @@ int encrypt(unsigned char* plaintext, unsigned long long plen, unsigned char* ci
                                   NULL, 0, NULL, nonce, key);
 }
 
-int decrypt(unsigned char* ciphertext, unsigned long long clen, unsigned char* decrypted, unsigned long long dlen)
+int ENode::decrypt(unsigned char* ciphertext, unsigned long long clen, unsigned char* decrypted, unsigned long long dlen)
 {
     unsigned long long decrypted_len;
     if (crypto_aead_aes256gcm_decrypt(decrypted, &decrypted_len,
                                       NULL, ciphertext, clen,
                                       NULL, 0, nonce, key) != 0) {
-        printf("Decryption failed\r\n");
+        eprintf("Decryption failed\r\n");
         return -1;
     }
     return 0;
 }
 
-int test_encdec()
+int ENode::test_encdec()
 {
     unsigned char msg[] = "Hello!";
     unsigned long long msg_len = sizeof(msg);
@@ -126,57 +121,60 @@ int test_encdec()
     unsigned long long ciphertext_len = sizeof(ciphertext);
     unsigned char decrypted[sizeof(msg)];
     unsigned long long decrypted_len = sizeof(decrypted);
-    printf("Message: %s\r\n", msg);
+    eprintf("Message: %s\r\n", msg);
     encrypt(msg, msg_len, ciphertext, ciphertext_len);
-    printf("Encrypted: %s\r\n", ciphertext);
+    eprintf("Encrypted: %s\r\n", ciphertext);
     if(decrypt(ciphertext, ciphertext_len, decrypted, decrypted_len))
     {
         return DECRYPTION_FAILED;
     }
-    printf("Decrypted: %s\r\n", decrypted);
+    eprintf("Decrypted: %s\r\n", decrypted);
 }
 
-int test_recvfrom(int _port)
+ENode::ENode(int _port):port(_port)
 {
-    assert(node_sockets.find(_port) != node_sockets.end());
-    int sock = node_sockets[_port];
+    setup_socket();
+    test_recvfrom();
+    test_encdec();
+}
 
+ENode::~ENode()
+{
+    close(sock);
+}
+
+int ENode::test_recvfrom()
+{
     struct sockaddr_in cliAddr;
     memset(&cliAddr, 0, sizeof(cliAddr)); // Clear the structure
     socklen_t cliAddrLen = sizeof(cliAddr);
     char buff[1024] = {0};
     char ip[INET_ADDRSTRLEN];
     int port;
-    printf("encl_recvfrom: %d, %p, %d, %d, %p, %p\r\n", sock, buff, sizeof(buff), 0, (struct sockaddr*)&cliAddr, &cliAddrLen);
+    eprintf("encl_recvfrom: %d, %p, %d, %d, %p, %p\r\n", sock, buff, sizeof(buff), 0, (struct sockaddr*)&cliAddr, &cliAddrLen);
     ssize_t readStatus = recvfrom(sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, &port);
-    printf("encl_recvfrom: %d, %p, %d, %d, %s, %d\r\n", sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, port);
+    eprintf("encl_recvfrom: %d, %p, %d, %d, %s, %d\r\n", sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, port);
     if (readStatus < 0) {
-        printf("reading error...: %d\r\n", errno);
+        eprintf("reading error...: %d\r\n", errno);
         close(sock);
         return READING_ERROR;
     } else {
-        printf("Message received from %s:%d: %s\r\n", ip, port, buff);
+        eprintf("Message received from %s:%d: %s\r\n", ip, port, buff);
     }
 
     if (sendto(sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, port) < 0) {
-        printf("sending error...: %d\r\n", errno);
+        eprintf("sending error...: %d\r\n", errno);
         close(sock);
         return SENDING_ERROR;
     }
     return SUCCESS;
 }
 
-int setup_socket(int port)
+int ENode::setup_socket()
 {
-    if(node_sockets.find(port) != node_sockets.end())
-    {
-        printf("Socket already exists...: %d\r\n", node_sockets[port]);
-        return SOCKET_ALREADY_EXISTS;
-    }
-    int sock;
     //creating a new server socket
-    if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        printf("server socket creation error...\r\n");
+    if ((this->sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        eprintf("server socket creation error...\r\n");
         return SOCKET_CREATION_ERROR;
     }
 
@@ -186,31 +184,35 @@ int setup_socket(int port)
     serAddr.sin_port = htons(port);
     serAddr.sin_addr.s_addr = INADDR_ANY;
 
-    if ((bind(sock, (struct sockaddr*)&serAddr, sizeof(serAddr))) < 0) {
-        printf("server socket binding error...: %d\r\n", errno);
-        close(sock);
+    if ((bind(this->sock, (struct sockaddr*)&serAddr, sizeof(serAddr))) < 0) {
+        eprintf("server socket binding error...: %d\r\n", errno);
+        close(this->sock);
         return SOCKET_BINDING_ERROR;
     }
-    printf("server socket created...: %d\r\n", sock);
-    node_sockets[port] = sock;
+    eprintf("server socket created...: %d\r\n", this->sock);
     return SUCCESS;
+}
+
+void ENode::eprintf(const char *fmt, ...)
+{
+    char buf[BUFSIZ] = {'\0'};
+    std::string str = std::string("[ENode ") + std::to_string(port) + "]> ";
+    str += fmt;
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf, BUFSIZ, str.c_str(), args);
+    va_end(args);
+    ocall_print_string(buf);
 }
 
 int ecall_init(int _port)
 {
-    printf("Initializing enclave...\r\n");
-    int retval=0;
-    if((retval=setup_socket(_port))!=0)
+    printf("[Enclave]> Initializing enclave...\r\n");
+    if(nodes.find(_port) != nodes.end())
     {
-        return retval;
+        printf("[Enclave]> Node already exists...\r\n");
+        return SOCKET_ALREADY_EXISTS;
     }
-    if((retval=test_encdec())!=0)
-    {
-        return retval;
-    }
-    while(retval==0)
-    {
-        retval=test_recvfrom(_port);
-    }
-    return retval;
+    nodes.emplace(_port, ENode(_port));
+    return SUCCESS;
 }

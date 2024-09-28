@@ -10,6 +10,8 @@
 
 #define crypto_aead_aes256gcm_ABYTES    16U
 
+#define NODE_MGR "[Node Mgr]> "
+
 std::map<int, Node*> Node::nodes;
 const char* Node::ENCLAVE_FILE = "node/enclave.signed.so";
 
@@ -125,29 +127,6 @@ void print_error_message(sgx_status_t ret)
         printf("Error: Unexpected error occurred.\r\n");
 }
 
-/* Initialize the enclave:
- *   Call sgx_create_enclave to initialize an enclave instance
- */
-int Node::initialize_enclave(const sgx_uswitchless_config_t* us_config)
-{
-    sgx_status_t ret = SGX_ERROR_UNEXPECTED;
-
-    /* Call sgx_create_enclave to initialize an enclave instance */
-    /* Debug Support: set 2nd parameter to 1 */
-
-    const void* enclave_ex_p[32] = { 0 };
-
-    enclave_ex_p[SGX_CREATE_ENCLAVE_EX_SWITCHLESS_BIT_IDX] = (const void*)us_config;
-
-    ret = sgx_create_enclave_ex(ENCLAVE_FILE, SGX_DEBUG_FLAG, NULL, NULL, &enclave_id, NULL, SGX_CREATE_ENCLAVE_EX_SWITCHLESS, enclave_ex_p);
-    if (ret != SGX_SUCCESS) {
-        print_error_message(ret);
-        return -1;
-    }
-
-    return 0;
-}
-
 void ocall_print_string(const char *str)
 {
     printf("%s", str);
@@ -188,38 +167,67 @@ Node::Node(uint16_t _port) : port(_port), enclave_id(0)
     /* Initialize the enclave */
     if (initialize_enclave(&us_config) < 0) 
     {
-        std::cerr << "Error: enclave initialization failed" << std::endl;
+        std::cerr << getPrefix() << "Error: enclave initialization failed" << std::endl;
         enclave_id = 0;
     } 
     else 
     {
-        std::cout << "SGX enclave initialized: " << enclave_id << std::endl;
+        std::cout << getPrefix() << "SGX enclave initialized: " << enclave_id << std::endl;
     }
     int retval = 0;
-    std::thread enclave(ecall_init, enclave_id, &retval, _port);
-    enclave.detach();
+    this->threads.emplace_back(ecall_init, enclave_id, &retval, _port);
 }
 
 Node::~Node() 
 {
+    std::cout << getPrefix() << "Destroying node instance..." << std::endl;
+    std::cout << getPrefix() << "Joining threads..." << std::endl;
+    for(auto& thread : this->threads)
+    {
+        thread.join();
+    }
+    std::cout << getPrefix() << "Threads joined." << std::endl;
     if (enclave_id != 0) 
     {
         sgx_destroy_enclave(enclave_id);
-        std::cout << "SGX enclave destroyed: " << enclave_id << std::endl;
+        std::cout << getPrefix()  << "SGX enclave destroyed: " << enclave_id << std::endl;
     }
+}
+
+/* Initialize the enclave:
+ *   Call sgx_create_enclave to initialize an enclave instance
+ */
+int Node::initialize_enclave(const sgx_uswitchless_config_t* us_config)
+{
+    sgx_status_t ret = SGX_ERROR_UNEXPECTED;
+
+    /* Call sgx_create_enclave to initialize an enclave instance */
+    /* Debug Support: set 2nd parameter to 1 */
+
+    const void* enclave_ex_p[32] = { 0 };
+
+    enclave_ex_p[SGX_CREATE_ENCLAVE_EX_SWITCHLESS_BIT_IDX] = (const void*)us_config;
+
+    ret = sgx_create_enclave_ex(ENCLAVE_FILE, SGX_DEBUG_FLAG, NULL, NULL, &enclave_id, NULL, SGX_CREATE_ENCLAVE_EX_SWITCHLESS, enclave_ex_p);
+    if (ret != SGX_SUCCESS) {
+        print_error_message(ret);
+        return -1;
+    }
+
+    return 0;
 }
 
 Node* Node::get_instance(uint16_t _port)
 {
     if (nodes.find(_port) == nodes.end())
     {
-        std::cout << "Creating node instance..." << std::endl;
+        std::cout << NODE_MGR << "Creating node instance..." << std::endl;
         nodes[_port] = new Node(_port);
-        std::cout << "Node instance created: " << nodes[_port] << std::endl;
+        std::cout << NODE_MGR << "Node instance created: " << nodes[_port] << std::endl;
     }
     else
     {
-        std::cout << "Node instance exists: " << nodes[_port] << std::endl;
+        std::cout << NODE_MGR << "Node instance exists: " << nodes[_port] << std::endl;
     }
     return nodes[_port];
 }
@@ -228,105 +236,23 @@ void Node::destroy_instance(uint16_t _port)
 {
     if (!nodes.empty() && nodes.find(_port) != nodes.end())
     {
-        std::cout << "Destroying node instance: " << nodes[_port] << std::endl;
+        std::cout << NODE_MGR << "Destroying node instance: " << nodes[_port] << std::endl;
         delete nodes[_port];
         nodes.erase(_port);
-        std::cout << "Node instance destroyed." << std::endl;
+        std::cout << NODE_MGR << "Node instance destroyed." << std::endl;
     }
     else
     {
-        std::cout << "Node instance does not exist. " << std::endl;
+        std::cout << NODE_MGR << "Node instance does not exist. " << std::endl;
     }
+}
+
+std::string Node::getPrefix()
+{
+    return "[Node "+std::to_string(port)+"]> ";
 }
 
 int Node::get_timestamp()
 {
     return 0;
-}
-
-void listen()
-{
-    int sock = socket(AF_INET, SOCK_DGRAM, 0);
-    std::map<std::pair<std::string, uint16_t>, int> siblings;
-    do
-    {
-
-        assert(sock >= 0);
-
-        struct sockaddr_in cliAddr;
-        socklen_t cliAddrLen = sizeof(cliAddr);
-        char buff[1024] = {0};
-        ssize_t readStatus = recvfrom(sock, buff, 1024, 0, (struct sockaddr*)&cliAddr, &cliAddrLen);
-        if (readStatus < 0) {
-            perror("reading error...\r\n");
-            close(sock);
-            exit(-1);
-        }
-
-        std::pair<std::string, uint16_t> cliAddrPair(inet_ntoa(cliAddr.sin_addr), ntohs(cliAddr.sin_port));
-        siblings[cliAddrPair] += 1;
-        std::cout << "Message received from: " << cliAddrPair.first << ":" << cliAddrPair.second << " = " << siblings[cliAddrPair] << std::endl;
-
-        //write but in a string
-        std::string arrivedMsg(buff);
-        if (arrivedMsg.find("Request") != std::string::npos)
-        {
-            std::cout << "Request received from: " << inet_ntoa(cliAddr.sin_addr) << ":" << ntohs(cliAddr.sin_port) << std::endl;
-            //print the message
-
-            char msg[1024] = {0};
-            sprintf(msg, "Response from %d\r\n", 12345);
-            if (sendto(sock, msg, strlen(msg), 0, (struct sockaddr*)&cliAddr, cliAddrLen) < 0) {
-                perror("sending error...\r\n");
-                close(sock);
-                exit(-1);
-            }
-        }
-        else
-        {
-            std::cout << "Message received from: " << inet_ntoa(cliAddr.sin_addr) << ":" << ntohs(cliAddr.sin_port) << std::endl;
-            std::cout.write(buff, readStatus);
-            //std::cout << std::endl;
-        }
-    } while (sock >= 0);
-}
-
-void contactSibling(const char* siblIP, uint16_t siblPort)
-{
-    int sock = socket(AF_INET, SOCK_DGRAM, 0);
-    std::map<std::pair<std::string, uint16_t>, int> siblings;
-    assert(sock >= 0);
-
-    if (siblings.find(std::pair<std::string, uint16_t>(siblIP, siblPort)) != siblings.end())
-    {
-        std::cout << "Sibling already added: " << siblIP << ":" << siblPort << std::endl;
-        return;
-    }
-
-    struct sockaddr_in serAddr;
-    serAddr.sin_family = AF_INET;
-    serAddr.sin_port = htons(siblPort);
-    serAddr.sin_addr.s_addr = inet_addr(siblIP);
-
-    char msg[1024] = {0};
-    sprintf(msg, "Request to %d\r\n", siblPort);
-
-    if (sendto(sock, msg, strlen(msg), 0, (struct sockaddr*)&serAddr, sizeof(serAddr)) < 0) {
-        perror("sending error...\r\n");
-        close(sock);
-        exit(-1);
-    }
-
-    std::pair<std::string, uint16_t> cliAddrPair(siblIP, siblPort);
-    siblings[cliAddrPair] = 0;
-
-}
-
-void printSiblings()
-{
-    std::map<std::pair<std::string, uint16_t>, int> siblings;
-    for (auto& sibl : siblings)
-    {
-        std::cout << sibl.first.first << ":" << sibl.first.second << " = " << sibl.second << std::endl;
-    }
 }

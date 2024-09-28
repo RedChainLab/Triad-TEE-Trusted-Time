@@ -3,6 +3,8 @@
 
 #include <iostream>
 #include <map>
+#include <thread>
+#include <vector>
 
 #include <sgx_urts.h>
 #include <sgx_uswitchless.h>
@@ -15,6 +17,7 @@ public:
 private:
     uint16_t port;
     std::map<std::pair<std::string, uint16_t>, int> siblings;
+    std::vector<std::thread> threads;
 
     Node(uint16_t _port);
     ~Node();
@@ -22,6 +25,7 @@ private:
     static std::map<int, Node*> nodes;
     sgx_enclave_id_t enclave_id;
     static const char* ENCLAVE_FILE;
+    std::string getPrefix();
 };
 
 #endif // NODE_H

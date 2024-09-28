@@ -36,6 +36,8 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#include "sodium.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
@@ -45,5 +47,29 @@ void printf(const char *fmt, ...);
 #if defined(__cplusplus)
 }
 #endif
+
+class ENode
+{
+public:
+    int port;
+    int sock;
+
+    unsigned char nonce[crypto_aead_aes256gcm_NPUBBYTES];
+    unsigned char key[crypto_aead_aes256gcm_KEYBYTES];
+
+
+    ENode(int _port);
+    ~ENode();
+private:
+    int setup_socket();
+    int test_recvfrom();
+
+    void incrementNonce();
+    int encrypt(unsigned char* plaintext, unsigned long long plen, unsigned char* ciphertext, unsigned long long clen);
+    int decrypt(unsigned char* ciphertext, unsigned long long clen, unsigned char* decrypted, unsigned long long dlen);
+    int test_encdec();
+
+    void eprintf(const char *fmt, ...);
+};
 
 #endif /* !_ENCLAVE_H_ */
