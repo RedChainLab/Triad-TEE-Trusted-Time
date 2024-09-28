@@ -307,37 +307,10 @@ int ENode::setup_socket()
 
     struct timeval read_timeout;
     read_timeout.tv_sec = 0;
-    read_timeout.tv_usec = 100;
+    read_timeout.tv_usec = 200000;
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &read_timeout, sizeof(read_timeout));
     sgx_thread_rwlock_unlock(&socket_rwlock);
     eprintf("server socket created...: %d\r\n", this->sock);
-    return SUCCESS;
-}
-
-int ENode::test_pong_ping()
-{
-    struct sockaddr_in cliAddr;
-    memset(&cliAddr, 0, sizeof(cliAddr)); // Clear the structure
-    socklen_t cliAddrLen = sizeof(cliAddr);
-    char buff[1024] = {0};
-    char ip[INET_ADDRSTRLEN];
-    int cport;
-    eprintf("encl_recvfrom: %d, %p, %d, %d, %p, %p\r\n", sock, buff, sizeof(buff), 0, (struct sockaddr*)&cliAddr, &cliAddrLen);
-    ssize_t readStatus = recvfrom(sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, &cport);
-    eprintf("encl_recvfrom: %d, %p, %d, %d, %s, %d\r\n", sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, cport);
-    if (readStatus < 0) {
-        eprintf("reading error...: %d\r\n", errno);
-        close(sock);
-        return READING_ERROR;
-    } else {
-        eprintf("Message received from %s:%d: %s\r\n", ip, cport, buff);
-    }
-
-    if (sendto(sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, cport) < 0) {
-        eprintf("sending error...: %d\r\n", errno);
-        close(sock);
-        return SENDING_ERROR;
-    }
     return SUCCESS;
 }
 
@@ -413,6 +386,7 @@ int ENode::handle_message(char* buff, char* ip, uint16_t cport)
     }
     return SUCCESS;
 }
+
 void ENode::print_siblings()
 {
     eprintf("%d siblings: ", siblings.size());
@@ -590,6 +564,7 @@ void ENode::monitor(int sleep_time, int sleep_inside_enclave, int verbosity){
         printf("counter_aex_count;monitor_aex_count;final_count\n");
         printf("%lld;%lld;%lld\n", aex_count, monitor_aex_count, add_count-reference);
     }
+    eprintf("Monitoring done.\r\n");
 }
 
 int ENode::add_sibling(std::string hostname, uint16_t _port)
@@ -613,9 +588,4 @@ int ENode::add_sibling(std::string hostname, uint16_t _port)
         return SENDING_ERROR;
     }
     return SUCCESS;
-}
-
-void ENode::test()
-{
-    loop_recvfrom();
 }

@@ -41,7 +41,8 @@ int ecall_start(uint16_t _port)
         printf("%sNode does not exist...\r\n", ENCLAVE_MGR);
         return SOCKET_ALREADY_EXISTS;
     }
-    nodes[_port]->test();
+    //nodes[_port]->loop_recvfrom();
+    nodes[_port]->monitor(20, 7, 2);
     printf("%sEnclave logic started.\r\n", ENCLAVE_MGR);
     return SUCCESS;
 }

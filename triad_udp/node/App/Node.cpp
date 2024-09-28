@@ -166,7 +166,7 @@ inline void set_thread_affinity(int core_id) {
     if (s != 0) {
         std::cerr << "Error setting thread affinity: " << strerror(s) << std::endl;
     }
-    std::cout<<"Core "<<sched_getcpu()<<std::endl;
+    std::cout<<"[utrst]> Core "<<sched_getcpu()<<std::endl;
 }
 
 static int start(int enclave_id, uint16_t port, int core_id)
@@ -178,6 +178,7 @@ static int start(int enclave_id, uint16_t port, int core_id)
     {
         print_error_message(ret);
     }
+    printf("[utrst]> ENode start finished.\r\n");
     return retval;
 }
 
@@ -223,7 +224,16 @@ Node::~Node()
     std::cout << getPrefix() << "Joining threads..." << std::endl;
     for(auto& thread : this->threads)
     {
-        thread.join();
+        std::cout << getPrefix() << "Joining thread?" << std::endl;
+        if(thread.joinable())
+        {
+            thread.join();
+            std::cout << getPrefix() << "Thread joined." << std::endl;
+        }
+        else
+        {
+            std::cout << getPrefix() << "Thread not joinable." << std::endl;
+        }
     }
     std::cout << getPrefix() << "Threads joined." << std::endl;
     if (enclave_id != 0) 

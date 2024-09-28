@@ -96,11 +96,17 @@ public:
 
     aex_handler_args_t aex_args;
 
-    void test();
+    void countAdd();
+    void loopOReadTSC();
+    void loopEReadTSC();
+    void monitor(int sleep_time, int sleep_inside_enclave, int verbosity);
+    int loop_recvfrom();
+
     int add_sibling(std::string hostname, uint16_t port);
 
     ENode(int _port);
     ~ENode();
+
 private:
     int sock;
 
@@ -111,25 +117,19 @@ private:
 
     bool isCounting;
 
+    bool should_stop();
+
     int setup_socket();
-    int test_pong_ping();
-
-    void countAdd();
-    void loopOReadTSC();
-    void loopEReadTSC();
-
-    void monitor(int sleep_time, int sleep_inside_enclave, int verbosity);
 
     int handle_message(char* buff, char* ip, uint16_t port);
-    int loop_recvfrom();
 
     void incrementNonce();
     int encrypt(const unsigned char* plaintext, const unsigned long long plen, unsigned char* ciphertext, unsigned long long* clen);
     int decrypt(const unsigned char* ciphertext, const unsigned long long clen, unsigned char* decrypted, unsigned long long* dlen);
     int test_encdec();
 
-    bool should_stop();
     void eprintf(const char *fmt, ...);
+
     void print_siblings();
 };
 
