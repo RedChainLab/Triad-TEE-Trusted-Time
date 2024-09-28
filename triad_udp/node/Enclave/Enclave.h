@@ -38,6 +38,8 @@
 
 #include "sodium.h"
 #include <sgx_thread.h>
+#include <vector>
+#include <string>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -52,22 +54,29 @@ void printf(const char *fmt, ...);
 class ENode
 {
 public:
-    int port;
+    const int port;
+
+    sgx_thread_rwlock_t stop_rwlock;
+    sgx_thread_rwlock_t socket_rwlock;
+
+    void test();
+    int add_sibling(std::string hostname, uint16_t port);
+
+    ENode(int _port);
+    ~ENode();
+private:
     int sock;
 
     unsigned char nonce[crypto_aead_aes256gcm_NPUBBYTES];
     unsigned char key[crypto_aead_aes256gcm_KEYBYTES];
 
-    sgx_thread_rwlock_t mutex;
-    void test();
-    ENode(int _port);
-    ~ENode();
-private:
+    std::vector<std::pair<std::string, uint16_t>> siblings;
+
     bool stop;
     int setup_socket();
     int test_pong_ping();
 
-    int handle_message(char* buff, char* ip, int port);
+    int handle_message(char* buff, char* ip, uint16_t port);
     int loop_recvfrom();
 
     void incrementNonce();
@@ -77,6 +86,7 @@ private:
 
     bool should_stop();
     void eprintf(const char *fmt, ...);
+    void print_siblings();
 };
 
 #endif /* !_ENCLAVE_H_ */

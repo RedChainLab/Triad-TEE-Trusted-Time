@@ -121,7 +121,7 @@ ssize_t recv(int fd, void *buf, size_t len, int flags)
     return -1;
 }
 
-ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, char* ip, int iplen, int port)
+ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const char* ip, int iplen, int port)
 {
     ssize_t ret = 0;
 

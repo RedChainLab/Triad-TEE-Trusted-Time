@@ -105,7 +105,7 @@ int u_close(int fd)
     return close(fd);
 }
 
-ssize_t u_sendto(int sockfd, const void *buf, size_t len, int flags, char* ip, int iplen, int port)
+ssize_t u_sendto(int sockfd, const void *buf, size_t len, int flags, const char* ip, int iplen, int port)
 {
     struct sockaddr_in dest_addr;
     dest_addr.sin_family = AF_INET;

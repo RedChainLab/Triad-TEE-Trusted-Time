@@ -64,7 +64,8 @@ enum {
     SOCKET_BINDING_ERROR = -3,
     READING_ERROR = -4,
     DECRYPTION_FAILED = -5,
-    SENDING_ERROR = -6
+    SENDING_ERROR = -6,
+    SOCKET_INEXISTENT = -7
 }; 
 
 std::map<int /*port*/, ENode*> nodes;
@@ -132,7 +133,8 @@ int ENode::test_encdec()
 
 ENode::ENode(int _port):port(_port), stop(false)
 {
-    sgx_thread_rwlock_init(&mutex, NULL);
+    sgx_thread_rwlock_init(&stop_rwlock, NULL);
+    sgx_thread_rwlock_init(&socket_rwlock, NULL);
     setup_socket();
     test_encdec();
 }
@@ -140,11 +142,15 @@ ENode::ENode(int _port):port(_port), stop(false)
 ENode::~ENode()
 {
     eprintf("Destroying node instance...\r\n");
-    sgx_thread_rwlock_wrlock(&mutex);
+    print_siblings();
+    sgx_thread_rwlock_wrlock(&stop_rwlock);
     stop=true;
-    sgx_thread_rwlock_unlock(&mutex);
-    sgx_thread_rwlock_destroy(&mutex);
+    sgx_thread_rwlock_unlock(&stop_rwlock);
+    sgx_thread_rwlock_destroy(&stop_rwlock);
+    sgx_thread_rwlock_wrlock(&socket_rwlock);
     close(sock);
+    sgx_thread_rwlock_unlock(&socket_rwlock);
+    sgx_thread_rwlock_destroy(&socket_rwlock);
     eprintf("Node instance destroyed.\r\n");
 }
 
@@ -177,9 +183,9 @@ int ENode::test_pong_ping()
 
 bool ENode::should_stop()
 {
-    sgx_thread_rwlock_rdlock(&mutex);
+    sgx_thread_rwlock_rdlock(&stop_rwlock);
     bool retval = stop;
-    sgx_thread_rwlock_unlock(&mutex);
+    sgx_thread_rwlock_unlock(&stop_rwlock);
     return retval;
 }
 
@@ -195,7 +201,14 @@ int ENode::loop_recvfrom()
         char ip[INET_ADDRSTRLEN];
         int cport;
         //eprintf("encl_recvfrom: %d, %p, %d, %d, %p, %p\r\n", sock, buff, sizeof(buff), 0, (struct sockaddr*)&cliAddr, &cliAddrLen);
+        sgx_thread_rwlock_rdlock(&socket_rwlock);
+        if(sock < 0)
+        {
+            sgx_thread_rwlock_unlock(&socket_rwlock);
+            return SOCKET_INEXISTENT;
+        }
         ssize_t readStatus = recvfrom(sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, &cport);
+        sgx_thread_rwlock_unlock(&socket_rwlock);
         if (readStatus < 0) {
             if (errno == EWOULDBLOCK || errno == EAGAIN) {
                 //eprintf("waiting for data...: %d\r\n", errno);
@@ -216,18 +229,44 @@ int ENode::loop_recvfrom()
     return retval;
 }
 
-int ENode::handle_message(char* buff, char* ip, int cport)
+int ENode::handle_message(char* buff, char* ip, uint16_t cport)
 {
-    if (sendto(sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, cport) < 0) {
-        eprintf("sending error...: %d\r\n", errno);
-        close(sock);
-        return SENDING_ERROR;
+    if(strcmp(buff, "Sibling")==0)
+    {
+        eprintf("Sibling message received from %s:%d\r\n", ip, cport);
+        if(std::find(siblings.begin(), siblings.end(), std::make_pair(std::string(ip), cport)) == siblings.end())
+        {
+            siblings.emplace_back(ip, cport);
+        }
+        else
+        {
+            eprintf("Sibling already added.\r\n");
+        }
+    }
+    else
+    {
+        sgx_thread_rwlock_rdlock(&socket_rwlock);
+        if(sock < 0)
+        {
+            sgx_thread_rwlock_unlock(&socket_rwlock);
+            return SOCKET_INEXISTENT;
+        }
+        ssize_t sendStatus = sendto(sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, cport);
+        sgx_thread_rwlock_unlock(&socket_rwlock);
+        if (sendStatus < 0) {
+            eprintf("sending error...: %d\r\n", errno);
+            sgx_thread_rwlock_rdlock(&socket_rwlock);
+            close(sock);
+            sgx_thread_rwlock_unlock(&socket_rwlock);
+            return SENDING_ERROR;
+        }
     }
     return SUCCESS;
 }
 
 int ENode::setup_socket()
 {
+    sgx_thread_rwlock_wrlock(&socket_rwlock);
     //creating a new server socket
     if ((this->sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         eprintf("server socket creation error...\r\n");
@@ -247,9 +286,10 @@ int ENode::setup_socket()
     }
 
     struct timeval read_timeout;
-    read_timeout.tv_sec = 1;
-    read_timeout.tv_usec = 0;
+    read_timeout.tv_sec = 0;
+    read_timeout.tv_usec = 100;
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &read_timeout, sizeof(read_timeout));
+    sgx_thread_rwlock_unlock(&socket_rwlock);
     eprintf("server socket created...: %d\r\n", this->sock);
     return SUCCESS;
 }
@@ -266,7 +306,7 @@ void ENode::eprintf(const char *fmt, ...)
     ocall_print_string(buf);
 }
 
-int ecall_init(int _port)
+int ecall_init(uint16_t _port)
 {
     printf("%sInitializing enclave...\r\n", ENCLAVE_MGR);
     if(nodes.find(_port) != nodes.end())
@@ -278,7 +318,7 @@ int ecall_init(int _port)
     return SUCCESS;
 }
 
-int ecall_stop(int _port)
+int ecall_stop(uint16_t _port)
 {
     printf("%sStopping enclave...\r\n", ENCLAVE_MGR);
     if(nodes.find(_port) == nodes.end())
@@ -292,7 +332,7 @@ int ecall_stop(int _port)
     return SUCCESS;
 }
 
-int ecall_start(int _port)
+int ecall_start(uint16_t _port)
 {
     printf("%sStarting enclave logic...\r\n", ENCLAVE_MGR);
     if(nodes.find(_port) == nodes.end())
@@ -305,7 +345,48 @@ int ecall_start(int _port)
     return SUCCESS;
 }
 
+int ecall_add_sibling(uint16_t _port, const char* hostname, uint16_t port)
+{
+    printf("%sAdding sibling at %s:%d to node at %d...\r\n", ENCLAVE_MGR, hostname, port, _port);
+    if(nodes.find(_port) == nodes.end())
+    {
+        printf("%sNode at %d does not exist...\r\n", ENCLAVE_MGR, _port);
+        return SOCKET_ALREADY_EXISTS;
+    }
+    nodes[_port]->add_sibling(std::string(hostname), port);
+    printf("%sSibling at %s:%d added to node at %d.\r\n", ENCLAVE_MGR, hostname, port, _port);
+    return SUCCESS;
+}
+
 void ENode::test()
 {
     loop_recvfrom();
+}
+
+int ENode::add_sibling(std::string hostname, uint16_t _port)
+{
+    eprintf("Adding sibling %s:%d to node...\r\n", hostname, _port);
+    siblings.emplace_back(hostname, _port);
+
+    const char* buff = "Sibling";
+    //eprintf("sento: %d, %s, %d, %d, %s, %d\r\n", sock, buff, sizeof(buff), 0, hostname.c_str(), _port);
+    ssize_t sendStatus = sendto(sock, buff, sizeof(buff), 0, hostname.c_str(), INET_ADDRSTRLEN, _port);
+    if (sendStatus< 0) {
+        eprintf("sending error...: %d\r\n", errno);
+        sgx_thread_rwlock_wrlock(&socket_rwlock);
+        close(sock);
+        sgx_thread_rwlock_unlock(&socket_rwlock);
+        return SENDING_ERROR;
+    }
+    return SUCCESS;
+}
+
+void ENode::print_siblings()
+{
+    eprintf("%d siblings: ", siblings.size());
+    for(auto& sibling: siblings)
+    {
+        printf("%s:%d, ", sibling.first.c_str(), sibling.second);
+    }
+    printf("\r\n");
 }

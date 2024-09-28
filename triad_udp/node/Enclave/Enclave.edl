@@ -38,9 +38,10 @@ enclave {
     from "sgx_socket.edl" import *;
 
     trusted {
-        public int ecall_init(int port);
-        public int ecall_stop(int port);
-        public int ecall_start(int port);
+        public int ecall_init(uint16_t port);
+        public int ecall_stop(uint16_t port);
+        public int ecall_start(uint16_t port);
+        public int ecall_add_sibling(uint16_t port, [in, string] const char* sibling_ip, uint16_t sibling_port);
     };
 
     untrusted {

@@ -273,3 +273,14 @@ int Node::get_timestamp()
 {
     return 0;
 }
+
+int Node::add_sibling(const std::string& hostname, uint16_t _port)
+{
+    int retval = 0;
+    sgx_status_t ret = ecall_add_sibling(enclave_id, &retval, port, hostname.c_str(), _port);
+    if (ret != SGX_SUCCESS) 
+    {
+        print_error_message(ret);
+    }
+    return retval;
+}

@@ -14,6 +14,7 @@ public:
     static Node* get_instance(uint16_t port);
     static void destroy_instance(uint16_t port);
     int get_timestamp();
+    int add_sibling(const std::string& hostname, uint16_t port);
 private:
     uint16_t port;
     std::map<std::pair<std::string, uint16_t>, int> siblings;
