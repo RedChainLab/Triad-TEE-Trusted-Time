@@ -132,6 +132,55 @@ void print_error_message(sgx_status_t ret)
         printf("Error: Unexpected error occurred: %x.\r\n", ret);
 }
 
+inline void set_affinity(int core_id) {
+    /*
+    set the affinity of the current thread to the core_id
+    */
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(core_id, &cpuset);
+
+    // Get the current thread (which is the main thread in this case)
+    pid_t pid = getpid();
+    //printf("pid: %d\n", pid);
+    
+    int result = sched_setaffinity(pid, sizeof(cpu_set_t), &cpuset);
+    if (result != 0) {
+        std::cerr << "Error setting thread affinity: " << strerror(result) << std::endl;
+    } else {
+        //std::cout << "Thread affinity set to CPU " << core_id << std::endl;
+    }
+    
+}
+
+inline void set_thread_affinity(int core_id) {
+    /*
+    set the affinity of the current thread to the core_id
+    */
+    pthread_t t = pthread_self();
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(core_id, &cpuset);
+
+    int s = pthread_setaffinity_np(t, sizeof(cpu_set_t), &cpuset);
+    if (s != 0) {
+        std::cerr << "Error setting thread affinity: " << strerror(s) << std::endl;
+    }
+    std::cout<<"Core "<<sched_getcpu()<<std::endl;
+}
+
+static int start(int enclave_id, uint16_t port, int core_id)
+{
+    set_thread_affinity(core_id);
+    int retval = 0;
+    sgx_status_t ret = ecall_start(enclave_id, &retval, port);
+    if (ret != SGX_SUCCESS) 
+    {
+        print_error_message(ret);
+    }
+    return retval;
+}
+
 Node::Node(uint16_t _port) : port(_port), enclave_id(0)
 {
     /* Configuration for Switchless SGX */
@@ -157,7 +206,7 @@ Node::Node(uint16_t _port) : port(_port), enclave_id(0)
     }
     std::cout << getPrefix() << "Node initialized" << std::endl;
 
-    threads.emplace_back(ecall_start, enclave_id, &retval, _port);
+    threads.emplace_back(start, enclave_id, _port, 2);
 }
 
 Node::~Node() 
