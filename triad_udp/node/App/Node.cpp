@@ -181,7 +181,7 @@ static int start(int enclave_id, uint16_t port, int core_id)
     return retval;
 }
 
-Node::Node(uint16_t _port) : port(_port), enclave_id(0)
+Node::Node(uint16_t _port, int _core_rdTSC) : port(_port), core_rdTSC(_core_rdTSC), enclave_id(0)
 {
     /* Configuration for Switchless SGX */
     sgx_uswitchless_config_t us_config = SGX_USWITCHLESS_CONFIG_INITIALIZER;
@@ -199,14 +199,14 @@ Node::Node(uint16_t _port) : port(_port), enclave_id(0)
         std::cout << getPrefix() << "SGX enclave initialized: " << enclave_id << std::endl;
     }
     int retval = 0;
-    sgx_status_t ret = ecall_init(enclave_id, &retval, _port);
+    sgx_status_t ret = ecall_init(enclave_id, &retval, port);
     if (ret != SGX_SUCCESS) 
     {
         print_error_message(ret);
     }
     std::cout << getPrefix() << "Node initialized" << std::endl;
 
-    threads.emplace_back(start, enclave_id, _port, 2);
+    threads.emplace_back(start, enclave_id, port, core_rdTSC);
 }
 
 Node::~Node() 
@@ -256,13 +256,13 @@ int Node::initialize_enclave(const sgx_uswitchless_config_t* us_config)
     return 0;
 }
 
-Node* Node::get_instance(uint16_t _port)
+Node* Node::get_instance(uint16_t _port, int _core_rdTSC)
 {
     std::cout << NODE_MGR << "Trying to create node with port "<< _port << "..." << std::endl;
     if (nodes.find(_port) == nodes.end())
     {
         std::cout << NODE_MGR << "Creating node instance..." << std::endl;
-        nodes[_port] = new Node(_port);
+        nodes[_port] = new Node(_port, _core_rdTSC);
         std::cout << NODE_MGR << "Node instance created: " << nodes[_port] << std::endl;
     }
     else

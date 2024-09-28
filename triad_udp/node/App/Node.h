@@ -11,16 +11,17 @@
 
 class Node {
 public:
-    static Node* get_instance(uint16_t port);
+    static Node* get_instance(uint16_t port, int core_rdTSC);
     static void destroy_instance(uint16_t port);
     int get_timestamp();
     int add_sibling(const std::string& hostname, uint16_t port);
 private:
     uint16_t port;
+    int core_rdTSC;
     std::map<std::pair<std::string, uint16_t>, int> siblings;
     std::vector<std::thread> threads;
 
-    Node(uint16_t _port);
+    Node(uint16_t _port, int _core_rdTSC);
     ~Node();
     int initialize_enclave(const sgx_uswitchless_config_t* us_config);
     static std::map<int, Node*> nodes;

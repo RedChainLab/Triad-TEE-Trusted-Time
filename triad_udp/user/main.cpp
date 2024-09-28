@@ -3,15 +3,16 @@
 #include "App/Node.h"
 
 int main(int argc, char* argv[]) {
-    if (argc < 2 || argc % 2 != 0) {
-        std::cerr << "Usage: " << argv[0] << " <port> [<hostname> <port> ...]" << std::endl;
+    if (argc < 3 || argc % 2 != 1) {
+        std::cerr << "Usage: " << argv[0] << " <port> <core_rdTSC> [<hostname> <port> ...]" << std::endl;
         return -1;
     }
 
     uint16_t port = atoi(argv[1]);
-    Node* node = Node::get_instance(port);
-    Node* node2 = Node::get_instance(port+1);
-    Node::get_instance(port);
+    int core_rdTSC = atoi(argv[2]);
+    Node* node = Node::get_instance(port, core_rdTSC);
+    Node* node2 = Node::get_instance(port+1, core_rdTSC+1);
+    Node::get_instance(port, core_rdTSC);
     node->get_timestamp();
 
     usleep(10000);
@@ -21,7 +22,7 @@ int main(int argc, char* argv[]) {
     std::string msg;
     std::cin >> msg;
 
-    for (int i = 2; i < argc; i += 2) {
+    for (int i = 3; i < argc; i += 2) {
         node->add_sibling(argv[i], atoi(argv[i+1]));
         node2->add_sibling(argv[i], atoi(argv[i+1]));
     }
