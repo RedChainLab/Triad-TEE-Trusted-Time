@@ -84,7 +84,7 @@ endif
 App_Cpp_Files := App/Node.cpp App/ocalls.cpp ../sgx_socket/untrusted_sgx_socket.cpp
 App_Include_Paths := -IApp -I$(SGX_SDK)/include
 
-App_C_Flags := $(SGX_COMMON_CFLAGS) -fPIC -Wall -Werror -Wno-attributes $(App_Include_Paths)
+App_C_Flags := -fPIC -Wall -Werror -Wno-attributes $(App_Include_Paths)
 
 # Three configuration modes - Debug, prerelease, release
 #   Debug - Macro DEBUG enabled.
@@ -119,12 +119,12 @@ else
 endif
 Crypto_Library_Name := sgx_tcrypto
 
-Enclave_Cpp_Files := $(wildcard Enclave/*.cpp) $(wildcard Enclave/Libsodium/*.cpp) ../sgx_socket/trusted_sgx_socket.cpp ../sgx_socket/htons.cpp
+Enclave_Cpp_Files := $(wildcard Enclave/*.cpp) $(wildcard Libsodium/*.cpp) ../sgx_socket/trusted_sgx_socket.cpp ../sgx_socket/htons.cpp
 Enclave_Include_Paths := -IEnclave -I../sgx_socket/include -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc -I$(SGX_SDK)/include/libcxx \
-	-IEnclave/Libsodium/include -IEnclave/Libsodium/include/sodium \
+	-ILibsodium/include -ILibsodium/include/sodium \
 	-I/usr/lib/gcc/x86_64-linux-gnu/12/include
 
-Enclave_C_Flags := -nostdinc -fvisibility=hidden -fpie -fstack-protector $(Enclave_Include_Paths)
+Enclave_C_Flags := -Wall -Werror -nostdinc -fvisibility=hidden -fpie -fstack-protector $(Enclave_Include_Paths)
 Enclave_Cpp_Flags := $(Enclave_C_Flags) $(SGX_COMMON_CXXFLAGS) -nostdinc++ -maes -msse4
 Enclave_C_Flags += $(SGX_COMMON_CFLAGS)
 
@@ -211,6 +211,11 @@ $(App_Name): App/Enclave_u.o $(App_Cpp_Objects)
 	@$(CXX) $^ -shared -Wl,-soname,$@ -o $@ $(App_Link_Flags)
 	@echo "LINK =>  $@"
 
+######## Libsodium Objects ########
+
+Libsodium/%.o: Libsodium/%.cpp
+	@$(CXX) -w $(Enclave_Cpp_Flags) -c $< -o $@
+	@echo "GEN  =>  $@"
 
 ######## Enclave Objects ########
 
@@ -219,7 +224,7 @@ Enclave/Enclave_t.h: $(SGX_EDGER8R) Enclave/Enclave.edl
 	@echo "GEN  =>  $@"
 
 ../sgx_socket/trusted_sgx_socket.o: ../sgx_socket/trusted_sgx_socket.cpp Enclave/Enclave_t.h
-	@$(CC) $(Enclave_C_Flags) -c $< -o $@
+	@$(CC) $(Enclave_Cpp_Flags) -c $< -o $@
 	@echo "CC   <=  $<"
 
 Enclave/Enclave_t.c: Enclave/Enclave_t.h

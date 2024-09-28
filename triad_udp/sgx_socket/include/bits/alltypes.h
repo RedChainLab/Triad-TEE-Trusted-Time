@@ -269,11 +269,9 @@ struct timeval { time_t tv_sec; suseconds_t tv_usec; };
 #define __DEFINED_struct_timeval
 #endif
 
-#if 0
 #if defined(__NEED_struct_timespec) && !defined(__DEFINED_struct_timespec)
 struct timespec { time_t tv_sec; long tv_nsec; };
 #define __DEFINED_struct_timespec
-#endif
 #endif
 
 #if defined(__NEED_pid_t) && !defined(__DEFINED_pid_t)

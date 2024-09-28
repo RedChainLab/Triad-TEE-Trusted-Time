@@ -32,7 +32,6 @@
 #include "Enclave_t.h"
 #include "ENode.h"
 #include <stdio.h>
-#include <string>
 #include <sgx_trts_aex.h>
 #include <sgx_thread.h>
 #include <map>
@@ -96,7 +95,8 @@ static void counter_aex_handler(const sgx_exception_info_t *info, const void * a
     know when AEX occurs (the number of ADD operations increases linearly) and how often it occurs.
     */
     (void)info;
-    aex_handler_args_t* aex_args = (aex_handler_args_t*)args;
+    aex_handler_args_t* aex_args;
+    memcpy(&aex_args, args, sizeof(aex_handler_args_t*));
     printf("AEX %d %d\r\n", aex_args->port, *aex_args->stop);
     log_aex(aex_args->count_aex, *(aex_args->aex_count), aex_args->add_count);
 }
@@ -108,7 +108,8 @@ static void monitor_aex_handler(const sgx_exception_info_t *info, const void * a
     know when AEX occurs (the number of ADD operations increases linearly) and how often it occurs.
     */
     (void)info;
-    aex_handler_args_t* aex_args = (aex_handler_args_t*)args;
+    aex_handler_args_t* aex_args;
+    memcpy(&aex_args, args, sizeof(aex_handler_args_t*));
     printf("AEX %d %d\r\n", aex_args->port, *aex_args->stop);
     log_aex(aex_args->monitor_aex, *(aex_args->monitor_aex_count), aex_args->add_count);
 }
