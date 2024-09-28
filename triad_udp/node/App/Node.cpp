@@ -106,6 +106,11 @@ static sgx_errlist_t sgx_errlist[] = {
         "Failed to reserve memory for the enclave.",
         NULL
     },
+    {
+        SGX_ERROR_ENCLAVE_CRASHED,
+        "The enclave is crashed.",
+        NULL
+    }
 };
 
 /* Check error conditions for loading enclave */
@@ -124,7 +129,7 @@ void print_error_message(sgx_status_t ret)
     }
 
     if (idx == ttl)
-        printf("Error: Unexpected error occurred.\r\n");
+        printf("Error: Unexpected error occurred: %x.\r\n", ret);
 }
 
 void ocall_print_string(const char *str)

@@ -51,13 +51,39 @@ void printf(const char *fmt, ...);
 }
 #endif
 
+#define SIZE 1024
+
+typedef struct {
+    sgx_thread_rwlock_t stop_rwlock;
+    bool* stop;
+    int port;
+    long long int* add_count;
+    long long int* aex_count;
+    long long int* monitor_aex_count;
+
+    long long int* count_aex;
+    long long int* monitor_aex;
+}aex_handler_args_t;
+
 class ENode
 {
 public:
-    const int port;
+    int port;
+    bool stop;
+
+    long long int add_count = 0;
+    long long int tsc = 0;
+
+    long long int aex_count = 0;
+    long long int monitor_aex_count = 0;
+
+    long long int count_aex[SIZE];
+    long long int monitor_aex[SIZE];
 
     sgx_thread_rwlock_t stop_rwlock;
     sgx_thread_rwlock_t socket_rwlock;
+
+    aex_handler_args_t aex_args;
 
     void test();
     int add_sibling(std::string hostname, uint16_t port);
@@ -72,9 +98,16 @@ private:
 
     std::vector<std::pair<std::string, uint16_t>> siblings;
 
-    bool stop;
+    bool isCounting;
+
     int setup_socket();
     int test_pong_ping();
+
+    void countAdd();
+    void loopOReadTSC();
+    void loopEReadTSC();
+
+    void monitor(int sleep_time, int sleep_inside_enclave, int verbosity);
 
     int handle_message(char* buff, char* ip, uint16_t port);
     int loop_recvfrom();
