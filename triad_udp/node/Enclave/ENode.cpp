@@ -169,7 +169,7 @@ void ENode::loopEReadTSC(void){
     sgx_unregister_aex_handler(counter_aex_handler);
 }
 
-ENode::ENode(int _port):port(_port), stop(false), add_count(0), aex_count(0), monitor_aex_count(0), sock(-1), isCounting(false)
+ENode::ENode(int _port):port(_port), stop(false), add_count(0), aex_count(0), monitor_aex_count(0), sock(-1), isCounting(false), monitor_stopped(false)
 {
     eprintf("Creating ENode instance...\r\n");
     memset(count_aex, 0, sizeof(count_aex));
@@ -193,7 +193,9 @@ ENode::~ENode()
     sgx_thread_rwlock_wrlock(&stop_rwlock);
     stop=true;
     sgx_thread_rwlock_unlock(&stop_rwlock);
+    while(!monitor_stopped);
     sgx_thread_rwlock_destroy(&stop_rwlock);
+    eprintf("ENode instance stopping...\r\n");
     sgx_thread_rwlock_wrlock(&socket_rwlock);
     close(sock);
     sgx_thread_rwlock_unlock(&socket_rwlock);
@@ -410,132 +412,140 @@ void ENode::monitor(int sleep_time, int sleep_inside_enclave, int verbosity){
             sgx_register_aex_handler(&node, monitor_aex_handler, (const void*)&aex_args);
         }
     }
-    
     long long int reference = 0;
-    this->isCounting = true;
-    switch(sleep_inside_enclave){
-        case SYSCALL_SLEEP:
-            do
-            {
-                reference = add_count;
-            } while(reference == 0);
-            ocall_sleep(&sleep_time);
-        break;
-        case O_READTSC_SLEEP:
-        {
-            do
-            {
-                reference = add_count;
-            } while(reference == 0);
-            ocall_readTSC(&reference);
-            while(tsc-reference < 3000000000*sleep_time){
-                ocall_readTSC(&tsc);
-            }
-        }
-        break;
-        case E_READTSC_SLEEP:
-        {
-            do
-            {
-                reference = add_count;
-            } while(reference == 0);
-            reference = rdtsc();
-            while(tsc-reference < 3000000000*sleep_time){
-                tsc = rdtsc();
-            }
-        }
-        break;
-        case C_ADDER_SLEEP:
-        {
-            do
-            {
-                reference = add_count;
-            } while(reference == 0);
-            for( long long int counter = 0; counter < 529*sleep_time; counter++){
-                for(int i = 0; i < 1000000; i++);
-            }
-        }
-        break;
-        case ASM_ADDER_SLEEP:
-        {
-            do
-            {
-                reference = add_count;
-            } while(reference == 0);
-            long long int counter = 3000000*sleep_time;
-            __asm__ volatile(
-                "mov %0, %%rcx\n\t"
-                "mov %1, %%rax\n\t"
-                "1: dec %%rax\n\t"
-                "mov %%rax, (%%rcx)\n\t"
-                "test %%rax, %%rax\n\t"
-                "jnz 1b"
-                :
-                : "r"(&counter), "r"(counter)
-                : "rcx", "rax"
-            );
-            //log_aex(count_aex, aex_count);
-        }
-        break;
-        case SELF_MONITOR:
-        {
-            long long int delta=0;
-            long long int THRESHOLD=600;
-            reference=rdtsc();
-            do{
-                long long int a=rdtsc();
-                do{
-                    add_count=rdtsc();
-                    delta=add_count-a;
-                    a=add_count;
-                } while(add_count-reference<3000000000*sleep_time && delta<THRESHOLD && delta>0);
-                if(delta>=THRESHOLD){
-                    log_aex(monitor_aex, monitor_aex_count, &add_count);
-                }
-                else if(delta<0){
-                    eprintf("Error: non-increasing TSC! delta=%lld\n", delta);
-                    break;
-                }
-            } while(add_count-reference<3000000000*sleep_time);
-        }
-        break;
-        case AEX_SELF_MONITOR:
-        {
-            reference=0;
-            long long int start_tsc=rdtsc();
-            long long int stop_tsc=3000000*sleep_time+start_tsc;
-            long long int current_tsc=reference;
-            do{
-                add_count++;
-                current_tsc=rdtsc();
-            } while(current_tsc<stop_tsc);
-        }
-        break;
-        case AEX_ASM_SELF_MONITOR:
-        {
-            reference=0;
-            long long int start_tsc=rdtsc();
-            long long int stop_tsc=3000000*sleep_time+start_tsc;
-            asm volatile(
-                "movq %0, %%r8\n\t"
-                "movq %1, %%r9\n\t"
-                "movq $0, %%r10\n\t"
+    while (!should_stop())
+    {    
+        reference = 0;
+        this->isCounting = true;
+        switch(sleep_inside_enclave){
+            case SYSCALL_SLEEP:
 
-                "1: rdtsc\n\t"
-                "shlq $32, %%rdx\n\t"
-                "orq %%rax, %%rdx\n\t"
-                "incq %%r10\n\t"
-                "movq %%r10, (%%r8)\n\t"
-                "cmpq %%r9, %%rdx\n\t"
-                "jl 1b\n\t"
-                :
-                : "r"(&add_count), "r"(stop_tsc)
-                : "rax", "rdx", "r8", "r9"
-            );
+                ocall_sleep(&sleep_time);
+            break;
+            case O_READTSC_SLEEP:
+            {
+
+                ocall_readTSC(&reference);
+                while(tsc-reference < 3000000000*sleep_time){
+                    ocall_readTSC(&tsc);
+                }
+            }
+            break;
+            case E_READTSC_SLEEP:
+            {
+
+                reference = rdtsc();
+                while(tsc-reference < 3000000000*sleep_time){
+                    tsc = rdtsc();
+                }
+            }
+            break;
+            case C_ADDER_SLEEP:
+            {
+
+                for( long long int counter = 0; counter < 529*sleep_time; counter++){
+                    for(int i = 0; i < 1000000; i++);
+                }
+            }
+            break;
+            case ASM_ADDER_SLEEP:
+            {
+
+                long long int counter = 3000000*sleep_time;
+                __asm__ volatile(
+                    "mov %0, %%rcx\n\t"
+                    "mov %1, %%rax\n\t"
+                    "1: dec %%rax\n\t"
+                    "mov %%rax, (%%rcx)\n\t"
+                    "test %%rax, %%rax\n\t"
+                    "jnz 1b"
+                    :
+                    : "r"(&counter), "r"(counter)
+                    : "rcx", "rax"
+                );
+                //log_aex(count_aex, aex_count);
+            }
+            break;
+            case SELF_MONITOR:
+            {
+                long long int delta=0;
+                long long int THRESHOLD=600;
+                reference=rdtsc();
+                do{
+                    long long int a=rdtsc();
+                    do{
+                        add_count=rdtsc();
+                        delta=add_count-a;
+                        a=add_count;
+                    } while(add_count-reference<3000000000*sleep_time && delta<THRESHOLD && delta>0);
+                    if(delta>=THRESHOLD){
+                        log_aex(monitor_aex, monitor_aex_count, &add_count);
+                    }
+                    else if(delta<0){
+                        eprintf("Error: non-increasing TSC! delta=%lld\n", delta);
+                        break;
+                    }
+                } while(add_count-reference<3000000000*sleep_time);
+            }
+            break;
+            case AEX_SELF_MONITOR:
+            {
+                reference=0;
+                long long int start_tsc=rdtsc();
+                long long int stop_tsc=3000000*sleep_time+start_tsc;
+                long long int current_tsc=reference;
+                do{
+                    add_count++;
+                    current_tsc=rdtsc();
+                } while(current_tsc<stop_tsc);
+            }
+            break;
+            case AEX_ASM_SELF_MONITOR:
+            {
+                reference=0;
+                long long int start_tsc=rdtsc();
+                long long int stop_tsc=3000000*sleep_time+start_tsc;
+                asm volatile(
+                    "movq %0, %%r8\n\t"
+                    "movq %1, %%r9\n\t"
+                    "movq $0, %%r10\n\t"
+
+                    "1: rdtsc\n\t"
+                    "shlq $32, %%rdx\n\t"
+                    "orq %%rax, %%rdx\n\t"
+                    "incq %%r10\n\t"
+                    "movq %%r10, (%%r8)\n\t"
+                    "cmpq %%r9, %%rdx\n\t"
+                    "jl 1b\n\t"
+                    :
+                    : "r"(&add_count), "r"(stop_tsc)
+                    : "rax", "rdx", "r8", "r9"
+                );
+            }
+            break;
         }
-        break;
+        this->isCounting = false;
+
+        if(verbosity>=1)
+        {
+            printf("idx;count\n");
+            printArray(count_aex, aex_count, reference);
+        }
+        if(verbosity>=2)
+        {
+            printf("idx;monitor_aex_count\n");
+            printArray(monitor_aex, monitor_aex_count, reference);
+        }
+        if(verbosity==1)
+        {
+            printf("%lld;%lld\n", aex_count, add_count-reference);
+        }
+        if(verbosity>=2)
+        {
+            printf("counter_aex_count;monitor_aex_count;final_count\n");
+            printf("%lld;%lld;%lld\n", aex_count, monitor_aex_count, add_count-reference);
+        }
     }
-    this->isCounting = false;
     if(sleep_inside_enclave != SELF_MONITOR){
         if(sleep_inside_enclave == AEX_SELF_MONITOR || sleep_inside_enclave == AEX_ASM_SELF_MONITOR){
             sgx_unregister_aex_handler(counter_aex_handler);
@@ -544,27 +554,8 @@ void ENode::monitor(int sleep_time, int sleep_inside_enclave, int verbosity){
             sgx_unregister_aex_handler(monitor_aex_handler);
         }
     }
-
-    if(verbosity>=1)
-    {
-        printf("idx;count\n");
-        printArray(count_aex, aex_count, reference);
-    }
-    if(verbosity>=2)
-    {
-        printf("idx;monitor_aex_count\n");
-        printArray(monitor_aex, monitor_aex_count, reference);
-    }
-    if(verbosity==1)
-    {
-        printf("%lld;%lld\n", aex_count, add_count-reference);
-    }
-    if(verbosity>=2)
-    {
-        printf("counter_aex_count;monitor_aex_count;final_count\n");
-        printf("%lld;%lld;%lld\n", aex_count, monitor_aex_count, add_count-reference);
-    }
     eprintf("Monitoring done.\r\n");
+    monitor_stopped = true;
 }
 
 int ENode::add_sibling(std::string hostname, uint16_t _port)

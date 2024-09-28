@@ -11,12 +11,11 @@ int main(int argc, char* argv[]) {
     uint16_t port = atoi(argv[1]);
     int core_rdTSC = atoi(argv[2]);
     Node* node = Node::get_instance(port, core_rdTSC);
-    Node* node2 = Node::get_instance(port+1, core_rdTSC+1);
-    Node::get_instance(port, core_rdTSC);
+    //Node::get_instance(port, core_rdTSC);
     node->get_timestamp();
 
     usleep(10000);
-    node->add_sibling("127.0.0.1", port+1);
+    //node->add_sibling("127.0.0.1", port+1);
 
     std::cout << "<Enter anything to continue>"<< std::endl;
     std::string msg;
@@ -24,14 +23,14 @@ int main(int argc, char* argv[]) {
 
     for (int i = 3; i < argc; i += 2) {
         node->add_sibling(argv[i], atoi(argv[i+1]));
-        node2->add_sibling(argv[i], atoi(argv[i+1]));
+        //node2->add_sibling(argv[i], atoi(argv[i+1]));
     }
 
     std::cout << "<Enter anything to continue>"<< std::endl;
     std::cin >> msg;
 
     Node::destroy_instance(port);
-    Node::destroy_instance(port);
-    Node::destroy_instance(port+1);
+    //Node::destroy_instance(port);
+    //Node::destroy_instance(port+1);
     return 0;
 }
