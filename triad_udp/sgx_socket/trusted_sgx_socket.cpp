@@ -30,7 +30,6 @@
  */
 
 #include "../node/Enclave/Enclave_t.h"
-#include "../node/Enclave/Enclave.h"
 
 #include "sgx_trts.h"
 #include "sys/socket.h"

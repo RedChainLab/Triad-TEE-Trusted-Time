@@ -45,11 +45,24 @@
 extern "C" {
 #endif
 
+int printf(const char *fmt, ...);
+
 #if defined(__cplusplus)
 }
 #endif
 
 #define SIZE 1024
+
+enum {
+    SUCCESS = 0,
+    SOCKET_ALREADY_EXISTS = -1,
+    SOCKET_CREATION_ERROR = -2,
+    SOCKET_BINDING_ERROR = -3,
+    READING_ERROR = -4,
+    DECRYPTION_FAILED = -5,
+    SENDING_ERROR = -6,
+    SOCKET_INEXISTENT = -7
+}; 
 
 typedef struct {
     sgx_thread_rwlock_t stop_rwlock;

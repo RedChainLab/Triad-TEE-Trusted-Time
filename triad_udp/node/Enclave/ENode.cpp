@@ -30,7 +30,7 @@
  */
 #include "sys/socket.h"
 #include "Enclave_t.h"
-#include "Enclave.h"
+#include "ENode.h"
 #include <stdio.h>
 #include <string>
 #include <sgx_trts_aex.h>
@@ -41,7 +41,7 @@
 extern "C" {
 #endif
 
-static void printf(const char *fmt, ...)
+int printf(const char *fmt, ...)
 {
     char buf[BUFSIZ] = {'\0'};
     va_list args;
@@ -49,24 +49,12 @@ static void printf(const char *fmt, ...)
     vsnprintf(buf, BUFSIZ, fmt, args);
     va_end(args);
     ocall_print_string(buf);
+    return 0;
 }
 
 #ifdef __cplusplus
 }
 #endif
-
-#define ENCLAVE_MGR "[ENode Mgr]> "
-
-enum {
-    SUCCESS = 0,
-    SOCKET_ALREADY_EXISTS = -1,
-    SOCKET_CREATION_ERROR = -2,
-    SOCKET_BINDING_ERROR = -3,
-    READING_ERROR = -4,
-    DECRYPTION_FAILED = -5,
-    SENDING_ERROR = -6,
-    SOCKET_INEXISTENT = -7
-}; 
 
 typedef enum {
     SYSCALL_SLEEP = 0,
@@ -180,7 +168,7 @@ void ENode::loopEReadTSC(void){
     sgx_unregister_aex_handler(counter_aex_handler);
 }
 
-ENode::ENode(int _port):port(_port), stop(false), sock(-1), isCounting(false), add_count(0), aex_count(0), monitor_aex_count(0)
+ENode::ENode(int _port):port(_port), stop(false), add_count(0), aex_count(0), monitor_aex_count(0), sock(-1), isCounting(false)
 {
     eprintf("Creating ENode instance...\r\n");
     memset(count_aex, 0, sizeof(count_aex));
@@ -242,7 +230,7 @@ void ENode::incrementNonce(void)
     }
     else
     {
-        for(int i = 0; i < crypto_aead_aes256gcm_NPUBBYTES; i++)
+        for(unsigned int i = 0; i < crypto_aead_aes256gcm_NPUBBYTES; i++)
         {
             nonce[i]++;
             if(nonce[i] != 0)
@@ -629,57 +617,4 @@ int ENode::add_sibling(std::string hostname, uint16_t _port)
 void ENode::test()
 {
     loop_recvfrom();
-}
-
-int ecall_init(uint16_t _port)
-{
-    printf("%sInitializing enclave node...\r\n", ENCLAVE_MGR);
-    if(nodes.find(_port) != nodes.end())
-    {
-        printf("%sNode already exists.\r\n", ENCLAVE_MGR);
-        return SOCKET_ALREADY_EXISTS;
-    }
-    printf("%sNode does not exist yet. Creating...\r\n", ENCLAVE_MGR);
-    nodes.emplace(_port, new ENode(_port));
-    return SUCCESS;
-}
-
-int ecall_stop(uint16_t _port)
-{
-    printf("%sStopping enclave...\r\n", ENCLAVE_MGR);
-    if(nodes.find(_port) == nodes.end())
-    {
-        printf("%sNode does not exist.\r\n", ENCLAVE_MGR);
-        return SOCKET_ALREADY_EXISTS;
-    }
-    delete nodes[_port];
-    nodes.erase(_port);
-    printf("%sEnclave stopped.\r\n", ENCLAVE_MGR);
-    return SUCCESS;
-}
-
-int ecall_start(uint16_t _port)
-{
-    printf("%sStarting enclave logic...\r\n", ENCLAVE_MGR);
-    if(nodes.find(_port) == nodes.end())
-    {
-        printf("%sNode does not exist...\r\n", ENCLAVE_MGR);
-        return SOCKET_ALREADY_EXISTS;
-    }
-    nodes[_port]->test();
-    printf("%sEnclave logic started.\r\n", ENCLAVE_MGR);
-    return SUCCESS;
-}
-
-int ecall_add_sibling(uint16_t _port, const char* hostname, uint16_t port)
-{
-    printf("%sAdding sibling at %s:%d to node at %d...\r\n", ENCLAVE_MGR, hostname, port, _port);
-    if(nodes.find(_port) == nodes.end())
-    {
-        printf("%sNode at %d does not exist...\r\n", ENCLAVE_MGR, _port);
-        return SOCKET_ALREADY_EXISTS;
-    }
-    nodes[_port]->add_sibling(std::string(hostname), port);
-    printf("%sSibling at %s:%d added to node at %d.\r\n", ENCLAVE_MGR, hostname, port, _port);
-    return SUCCESS;
 }
