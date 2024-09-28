@@ -37,6 +37,7 @@
 #include <assert.h>
 
 #include "sodium.h"
+#include <sgx_thread.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -57,18 +58,24 @@ public:
     unsigned char nonce[crypto_aead_aes256gcm_NPUBBYTES];
     unsigned char key[crypto_aead_aes256gcm_KEYBYTES];
 
-
+    sgx_thread_rwlock_t mutex;
+    void test();
     ENode(int _port);
     ~ENode();
 private:
+    bool stop;
     int setup_socket();
-    int test_recvfrom();
+    int test_pong_ping();
+
+    int handle_message(char* buff, char* ip, int port);
+    int loop_recvfrom();
 
     void incrementNonce();
-    int encrypt(unsigned char* plaintext, unsigned long long plen, unsigned char* ciphertext, unsigned long long clen);
-    int decrypt(unsigned char* ciphertext, unsigned long long clen, unsigned char* decrypted, unsigned long long dlen);
+    int encrypt(const unsigned char* plaintext, const unsigned long long plen, unsigned char* ciphertext, unsigned long long* clen);
+    int decrypt(const unsigned char* ciphertext, const unsigned long long clen, unsigned char* decrypted, unsigned long long* dlen);
     int test_encdec();
 
+    bool should_stop();
     void eprintf(const char *fmt, ...);
 };
 

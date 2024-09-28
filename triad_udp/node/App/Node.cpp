@@ -175,12 +175,27 @@ Node::Node(uint16_t _port) : port(_port), enclave_id(0)
         std::cout << getPrefix() << "SGX enclave initialized: " << enclave_id << std::endl;
     }
     int retval = 0;
-    this->threads.emplace_back(ecall_init, enclave_id, &retval, _port);
+    sgx_status_t ret = ecall_init(enclave_id, &retval, _port);
+    if (ret != SGX_SUCCESS) 
+    {
+        print_error_message(ret);
+    }
+    std::cout << getPrefix() << "Node initialized" << std::endl;
+
+    threads.emplace_back(ecall_start, enclave_id, &retval, _port);
 }
 
 Node::~Node() 
 {
     std::cout << getPrefix() << "Destroying node instance..." << std::endl;
+    std::cout << getPrefix() << "Signalling to stop..." << std::endl;
+
+    int retvalue = 0;
+    sgx_status_t ret = ecall_stop(enclave_id, &retvalue, port);
+    if (ret != SGX_SUCCESS) 
+    {
+        print_error_message(ret);
+    }
     std::cout << getPrefix() << "Joining threads..." << std::endl;
     for(auto& thread : this->threads)
     {

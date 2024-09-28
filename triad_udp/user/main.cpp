@@ -10,6 +10,7 @@ int main(int argc, char* argv[]) {
 
     uint16_t port = atoi(argv[1]);
     Node* node = Node::get_instance(port);
+    Node* node2 = Node::get_instance(port+1);
     Node::get_instance(port);
     node->get_timestamp();
 
@@ -17,6 +18,7 @@ int main(int argc, char* argv[]) {
     std::cout << "<Enter anything to continue>"<< std::endl;
     std::string msg;
     std::cin >> msg;
+    Node::destroy_instance(port+1);
     Node::destroy_instance(port);
     Node::destroy_instance(port);
     return 0;

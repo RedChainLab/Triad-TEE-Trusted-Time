@@ -39,6 +39,8 @@ enclave {
 
     trusted {
         public int ecall_init(int port);
+        public int ecall_stop(int port);
+        public int ecall_start(int port);
     };
 
     untrusted {

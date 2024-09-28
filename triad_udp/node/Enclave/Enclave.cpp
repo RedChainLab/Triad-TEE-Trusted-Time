@@ -67,7 +67,7 @@ enum {
     SENDING_ERROR = -6
 }; 
 
-std::map<int /*port*/, ENode> nodes;
+std::map<int /*port*/, ENode*> nodes;
 
 void ENode::incrementNonce(void)
 {
@@ -90,23 +90,19 @@ void ENode::incrementNonce(void)
     }
 }
 
-int ENode::encrypt(unsigned char* plaintext, unsigned long long plen, unsigned char* ciphertext, unsigned long long clen)
+int ENode::encrypt(const unsigned char* plaintext, const unsigned long long plen, unsigned char* ciphertext, unsigned long long* clen)
 {
-    unsigned long long decrypted_len;
-    unsigned char decrypted[plen + 1];
-
     incrementNonce();
     randombytes_buf(key, sizeof(key));
 
-    crypto_aead_aes256gcm_encrypt((unsigned char*)ciphertext, &clen,
+    crypto_aead_aes256gcm_encrypt((unsigned char*)ciphertext, clen,
                                   (unsigned char*)plaintext, plen,
                                   NULL, 0, NULL, nonce, key);
 }
 
-int ENode::decrypt(unsigned char* ciphertext, unsigned long long clen, unsigned char* decrypted, unsigned long long dlen)
+int ENode::decrypt(const unsigned char* ciphertext, const unsigned long long clen, unsigned char* decrypted, unsigned long long* dlen)
 {
-    unsigned long long decrypted_len;
-    if (crypto_aead_aes256gcm_decrypt(decrypted, &decrypted_len,
+    if (crypto_aead_aes256gcm_decrypt(decrypted, dlen,
                                       NULL, ciphertext, clen,
                                       NULL, 0, nonce, key) != 0) {
         eprintf("Decryption failed\r\n");
@@ -124,47 +120,97 @@ int ENode::test_encdec()
     unsigned char decrypted[sizeof(msg)];
     unsigned long long decrypted_len = sizeof(decrypted);
     eprintf("Message: %s\r\n", msg);
-    encrypt(msg, msg_len, ciphertext, ciphertext_len);
+    encrypt(msg, msg_len, ciphertext, &ciphertext_len);
     eprintf("Encrypted: %s\r\n", ciphertext);
-    if(decrypt(ciphertext, ciphertext_len, decrypted, decrypted_len))
+    if(decrypt(ciphertext, ciphertext_len, decrypted, &decrypted_len))
     {
         return DECRYPTION_FAILED;
     }
     eprintf("Decrypted: %s\r\n", decrypted);
+    return SUCCESS;
 }
 
-ENode::ENode(int _port):port(_port)
+ENode::ENode(int _port):port(_port), stop(false)
 {
+    sgx_thread_rwlock_init(&mutex, NULL);
     setup_socket();
-    test_recvfrom();
     test_encdec();
 }
 
 ENode::~ENode()
 {
+    eprintf("Destroying node instance...\r\n");
+    sgx_thread_rwlock_wrlock(&mutex);
+    stop=true;
+    sgx_thread_rwlock_unlock(&mutex);
+    sgx_thread_rwlock_destroy(&mutex);
     close(sock);
+    eprintf("Node instance destroyed...\r\n");
 }
 
-int ENode::test_recvfrom()
+int ENode::test_pong_ping()
 {
     struct sockaddr_in cliAddr;
     memset(&cliAddr, 0, sizeof(cliAddr)); // Clear the structure
     socklen_t cliAddrLen = sizeof(cliAddr);
     char buff[1024] = {0};
     char ip[INET_ADDRSTRLEN];
-    int port;
+    int cport;
     eprintf("encl_recvfrom: %d, %p, %d, %d, %p, %p\r\n", sock, buff, sizeof(buff), 0, (struct sockaddr*)&cliAddr, &cliAddrLen);
-    ssize_t readStatus = recvfrom(sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, &port);
-    eprintf("encl_recvfrom: %d, %p, %d, %d, %s, %d\r\n", sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, port);
+    ssize_t readStatus = recvfrom(sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, &cport);
+    eprintf("encl_recvfrom: %d, %p, %d, %d, %s, %d\r\n", sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, cport);
     if (readStatus < 0) {
         eprintf("reading error...: %d\r\n", errno);
         close(sock);
         return READING_ERROR;
     } else {
-        eprintf("Message received from %s:%d: %s\r\n", ip, port, buff);
+        eprintf("Message received from %s:%d: %s\r\n", ip, cport, buff);
     }
 
-    if (sendto(sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, port) < 0) {
+    if (sendto(sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, cport) < 0) {
+        eprintf("sending error...: %d\r\n", errno);
+        close(sock);
+        return SENDING_ERROR;
+    }
+    return SUCCESS;
+}
+
+bool ENode::should_stop()
+{
+    sgx_thread_rwlock_rdlock(&mutex);
+    bool retval = stop;
+    sgx_thread_rwlock_unlock(&mutex);
+    return retval;
+}
+
+int ENode::loop_recvfrom()
+{
+    int retval=SUCCESS;
+    while (retval == SUCCESS && !should_stop())
+    {    
+        struct sockaddr_in cliAddr;
+        memset(&cliAddr, 0, sizeof(cliAddr)); // Clear the structure
+        socklen_t cliAddrLen = sizeof(cliAddr);
+        char buff[1024] = {0};
+        char ip[INET_ADDRSTRLEN];
+        int cport;
+        eprintf("encl_recvfrom: %d, %p, %d, %d, %p, %p\r\n", sock, buff, sizeof(buff), 0, (struct sockaddr*)&cliAddr, &cliAddrLen);
+        ssize_t readStatus = recvfrom(sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, &cport);
+        eprintf("encl_recvfrom: %d, %p, %d, %d, %s, %d\r\n", sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, port);
+        if (readStatus < 0) {
+            eprintf("reading error...: %d\r\n", errno);
+            close(sock);
+            return READING_ERROR;
+        }
+        eprintf("Message received from %s:%d: %s\r\n", ip, cport, buff);
+        retval=handle_message(buff, ip, cport);
+    }
+    return retval;
+}
+
+int ENode::handle_message(char* buff, char* ip, int cport)
+{
+    if (sendto(sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, cport) < 0) {
         eprintf("sending error...: %d\r\n", errno);
         close(sock);
         return SENDING_ERROR;
@@ -215,6 +261,36 @@ int ecall_init(int _port)
         printf("%sNode already exists...\r\n", ENCLAVE_MGR);
         return SOCKET_ALREADY_EXISTS;
     }
-    nodes.emplace(_port, ENode(_port));
+    nodes.emplace(_port, new ENode(_port));
     return SUCCESS;
+}
+
+int ecall_stop(int _port)
+{
+    printf("%sStopping enclave...\r\n", ENCLAVE_MGR);
+    if(nodes.find(_port) == nodes.end())
+    {
+        printf("%sNode does not exist...\r\n", ENCLAVE_MGR);
+        return SOCKET_ALREADY_EXISTS;
+    }
+    delete nodes[_port];
+    nodes.erase(_port);
+    return SUCCESS;
+}
+
+int ecall_start(int _port)
+{
+    if(nodes.find(_port) == nodes.end())
+    {
+        printf("%sNode does not exist...\r\n", ENCLAVE_MGR);
+        return SOCKET_ALREADY_EXISTS;
+    }
+    printf("%sStarting enclave logic...\r\n", ENCLAVE_MGR);
+    nodes[_port]->test();
+    return SUCCESS;
+}
+
+void ENode::test()
+{
+    loop_recvfrom();
 }
