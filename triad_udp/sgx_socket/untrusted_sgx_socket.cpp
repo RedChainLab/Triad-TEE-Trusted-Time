@@ -120,15 +120,15 @@ ssize_t u_recvfrom(int sockfd, void *buf, size_t len, int flags, char* ip, int i
     struct sockaddr_in cliAddr;
     socklen_t cliAddrLen = sizeof(cliAddr);
     char buff[1024] = {0};
-    printf("[utrst]> %d, %p, %ld, %d, %p, %p\r\n", sockfd, buf, len, flags, (struct sockaddr*)&cliAddr, &cliAddrLen);
+    //printf("[utrst]> %d, %p, %ld, %d, %p, %p\r\n", sockfd, buf, len, flags, (struct sockaddr*)&cliAddr, &cliAddrLen);
     ssize_t ret=recvfrom(sockfd, buf, len, flags, (struct sockaddr*)&cliAddr, &cliAddrLen);
     char *ipaddr = inet_ntoa(cliAddr.sin_addr);
-    printf("[utrst]> %d, %p, %ld, %d, %s, %d\r\n", sockfd, buf, len, flags, ipaddr, ntohs(cliAddr.sin_port));
+    //printf("[utrst]> %d, %p, %ld, %d, %s, %d\r\n", sockfd, buf, len, flags, ipaddr, ntohs(cliAddr.sin_port));
     strcpy(ip, ipaddr);
     *port = ntohs(cliAddr.sin_port);
-    printf("[utrst]> %d, %p, %ld, %d, %s, %d\r\n", sockfd, buf, len, flags, ip, *port);
-    printf("[utrst]> msg size: %ld\r\n", ret);
-    return 0;
+    //printf("[utrst]> %d, %p, %ld, %d, %s, %d\r\n", sockfd, buf, len, flags, ip, *port);
+    //printf("[utrst]> msg size: %ld\r\n", ret);
+    return ret;
 }
 
 #ifdef __cplusplus

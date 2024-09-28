@@ -194,16 +194,24 @@ int ENode::loop_recvfrom()
         char buff[1024] = {0};
         char ip[INET_ADDRSTRLEN];
         int cport;
-        eprintf("encl_recvfrom: %d, %p, %d, %d, %p, %p\r\n", sock, buff, sizeof(buff), 0, (struct sockaddr*)&cliAddr, &cliAddrLen);
+        //eprintf("encl_recvfrom: %d, %p, %d, %d, %p, %p\r\n", sock, buff, sizeof(buff), 0, (struct sockaddr*)&cliAddr, &cliAddrLen);
         ssize_t readStatus = recvfrom(sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, &cport);
-        eprintf("encl_recvfrom: %d, %p, %d, %d, %s, %d\r\n", sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, port);
         if (readStatus < 0) {
-            eprintf("reading error...: %d\r\n", errno);
-            close(sock);
-            return READING_ERROR;
+            if (errno == EWOULDBLOCK || errno == EAGAIN) {
+                //eprintf("waiting for data...: %d\r\n", errno);
+                continue;
+            } else {
+                eprintf("reading error...: %d\r\n", errno);
+                close(sock);
+                return READING_ERROR;
+            }
         }
-        eprintf("Message received from %s:%d: %s\r\n", ip, cport, buff);
-        retval=handle_message(buff, ip, cport);
+        else if(readStatus > 0)
+        {
+            //eprintf("encl_recvfrom: %d, %p, %d, %d, %s, %d\r\n", sock, buff, sizeof(buff), 0, ip, cport);
+            eprintf("Message received from %s:%d: %s\r\n", ip, cport, buff);
+            retval=handle_message(buff, ip, cport);
+        }
     }
     return retval;
 }
@@ -237,6 +245,11 @@ int ENode::setup_socket()
         close(this->sock);
         return SOCKET_BINDING_ERROR;
     }
+
+    struct timeval read_timeout;
+    read_timeout.tv_sec = 1;
+    read_timeout.tv_usec = 0;
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &read_timeout, sizeof(read_timeout));
     eprintf("server socket created...: %d\r\n", this->sock);
     return SUCCESS;
 }
@@ -275,6 +288,7 @@ int ecall_stop(int _port)
     }
     delete nodes[_port];
     nodes.erase(_port);
+    printf("%sEnclave stopped...\r\n", ENCLAVE_MGR);
     return SUCCESS;
 }
 

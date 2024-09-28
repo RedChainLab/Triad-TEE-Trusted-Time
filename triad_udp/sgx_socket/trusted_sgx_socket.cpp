@@ -134,10 +134,10 @@ ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, char* ip, int
 ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, char* ip, int iplen, int* port)
 {
     ssize_t ret = 0;
-    printf("[trst]> t_recvfrom: %d, %p, %d, %d\r\n", sockfd, buf, len, flags);
+    //printf("[trst]> t_recvfrom: %d, %p, %d, %d\r\n", sockfd, buf, len, flags);
     if (u_recvfrom(&ret, sockfd, buf, len, flags, ip, iplen, port) == SGX_SUCCESS)
     {
-        printf("[trst]> t_recvfrom: %d, %p, %d, %d, %s, %d, %d\r\n", sockfd, buf, len, flags, ip,  port);
+        //printf("[trst]> t_recvfrom: %d, %p, %d, %d, %s, %d, %d\r\n", sockfd, buf, len, flags, ip,  port);
         return ret;
     }
 
