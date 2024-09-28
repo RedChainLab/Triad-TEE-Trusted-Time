@@ -55,6 +55,8 @@ void printf(const char *fmt, ...)
 }
 #endif
 
+#define ENCLAVE_MGR "[ENode Mgr]> "
+
 enum {
     SUCCESS = 0,
     SOCKET_ALREADY_EXISTS = -1,
@@ -207,10 +209,10 @@ void ENode::eprintf(const char *fmt, ...)
 
 int ecall_init(int _port)
 {
-    printf("[Enclave]> Initializing enclave...\r\n");
+    printf("%sInitializing enclave...\r\n", ENCLAVE_MGR);
     if(nodes.find(_port) != nodes.end())
     {
-        printf("[Enclave]> Node already exists...\r\n");
+        printf("%sNode already exists...\r\n", ENCLAVE_MGR);
         return SOCKET_ALREADY_EXISTS;
     }
     nodes.emplace(_port, ENode(_port));

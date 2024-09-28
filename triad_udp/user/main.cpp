@@ -1,6 +1,6 @@
 #include <unistd.h>
 
-#include "App/App.h"
+#include "App/Node.h"
 
 int main(int argc, char* argv[]) {
     if (argc < 2 || argc % 2 != 0) {

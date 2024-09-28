@@ -18,3 +18,4 @@ mvp_udp/server
 tsc
 triad
 **.pem
+.vscode/settings.json

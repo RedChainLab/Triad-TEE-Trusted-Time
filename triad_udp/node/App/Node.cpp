@@ -5,7 +5,7 @@
 #include <map>
 #include <thread>
 
-#include "App.h"
+#include "Node.h"
 #include "Enclave_u.h"
 
 #define crypto_aead_aes256gcm_ABYTES    16U
