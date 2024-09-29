@@ -65,8 +65,6 @@ enum {
 }; 
 
 typedef struct {
-    sgx_thread_rwlock_t stop_rwlock;
-    bool* stop;
     int port;
     long long int* add_count;
     long long int* aex_count;

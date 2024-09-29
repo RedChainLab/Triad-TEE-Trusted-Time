@@ -11,7 +11,8 @@ int main(int argc, char* argv[]) {
     uint16_t port = atoi(argv[1]);
     int core_rdTSC = atoi(argv[2]);
     Node* node = Node::get_instance(port, core_rdTSC);
-    //Node::get_instance(port, core_rdTSC);
+    Node* node2 = Node::get_instance(port+1, core_rdTSC+1);
+    Node::get_instance(port, core_rdTSC);
     node->get_timestamp();
 
     usleep(10000);
@@ -31,6 +32,6 @@ int main(int argc, char* argv[]) {
 
     Node::destroy_instance(port);
     //Node::destroy_instance(port);
-    //Node::destroy_instance(port+1);
+    Node::destroy_instance(port+1);
     return 0;
 }

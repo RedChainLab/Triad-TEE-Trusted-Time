@@ -95,9 +95,8 @@ static void counter_aex_handler(const sgx_exception_info_t *info, const void * a
     know when AEX occurs (the number of ADD operations increases linearly) and how often it occurs.
     */
     (void)info;
-    aex_handler_args_t* aex_args;
-    memcpy(&aex_args, args, sizeof(aex_handler_args_t*));
-    printf("AEX %d %d\r\n", aex_args->port, *aex_args->stop);
+    const aex_handler_args_t* aex_args=(const aex_handler_args_t*)args;
+    printf("[Handler %d]> AEX\r\n", aex_args->port);
     log_aex(aex_args->count_aex, *(aex_args->aex_count), aex_args->add_count);
 }
 
@@ -108,10 +107,12 @@ static void monitor_aex_handler(const sgx_exception_info_t *info, const void * a
     know when AEX occurs (the number of ADD operations increases linearly) and how often it occurs.
     */
     (void)info;
-    aex_handler_args_t* aex_args;
-    memcpy(&aex_args, args, sizeof(aex_handler_args_t*));
-    printf("AEX %d %d\r\n", aex_args->port, *aex_args->stop);
-    log_aex(aex_args->monitor_aex, *(aex_args->monitor_aex_count), aex_args->add_count);
+    (void)args;
+    printf("AEX\r\n");
+    // aex_handler_args_t* aex_args;
+    // memcpy(&aex_args, args, sizeof(aex_handler_args_t*));
+    // printf("AEX %d %d\r\n", aex_args->port, *aex_args->stop);
+    // log_aex(aex_args->monitor_aex, *(aex_args->monitor_aex_count), aex_args->add_count);
 }
 
 inline long long int rdtsc(void){
@@ -175,9 +176,12 @@ ENode::ENode(int _port):port(_port), stop(false), add_count(0), aex_count(0), mo
     memset(count_aex, 0, sizeof(count_aex));
     memset(monitor_aex, 0, sizeof(monitor_aex));
 
-    aex_args.stop = &stop;
     aex_args.port = port;
     aex_args.add_count = &add_count;
+    aex_args.aex_count = &aex_count;
+    aex_args.monitor_aex_count = &monitor_aex_count;
+    aex_args.count_aex = count_aex;
+    aex_args.monitor_aex = monitor_aex;
 
     sgx_thread_rwlock_init(&stop_rwlock, NULL);
     sgx_thread_rwlock_init(&socket_rwlock, NULL);
@@ -403,6 +407,13 @@ void ENode::monitor(int sleep_time, int sleep_inside_enclave, int verbosity){
     /*
     the main thread that will be called by the application.
     */ 
+
+    /*
+    * KNOWN ISSUE: Trying to run multiple same handlers in the same execution will block execution, maybe it crashes the enclave.
+    * Having only one handler in the execution works.
+    * -> Turns out, whenever an AEX occured, it had problems with arguments: removing them, it works.
+    * Remains to see how to safely pass arguments to the handler....
+    */
     sgx_aex_mitigation_node_t node;
     if(sleep_inside_enclave != SELF_MONITOR){
         if(sleep_inside_enclave == AEX_SELF_MONITOR || sleep_inside_enclave == AEX_ASM_SELF_MONITOR){
@@ -525,26 +536,30 @@ void ENode::monitor(int sleep_time, int sleep_inside_enclave, int verbosity){
             break;
         }
         this->isCounting = false;
-
+        eprintf("Monitoring...\r\n");
         if(verbosity>=1)
         {
-            printf("idx;count\n");
+            printf("idx;count\r\n");
             printArray(count_aex, aex_count, reference);
         }
         if(verbosity>=2)
         {
-            printf("idx;monitor_aex_count\n");
+            printf("idx;monitor_aex_count\r\n");
             printArray(monitor_aex, monitor_aex_count, reference);
         }
         if(verbosity==1)
         {
-            printf("%lld;%lld\n", aex_count, add_count-reference);
+            printf("%lld;%lld\r\n", aex_count, add_count-reference);
         }
         if(verbosity>=2)
         {
-            printf("counter_aex_count;monitor_aex_count;final_count\n");
+            printf("counter_aex_count;monitor_aex_count;final_count\r\n");
             printf("%lld;%lld;%lld\n", aex_count, monitor_aex_count, add_count-reference);
         }
+        memset(count_aex, 0, sizeof(count_aex));
+        memset(monitor_aex, 0, sizeof(monitor_aex));
+        aex_count=0;
+        monitor_aex_count=0;
     }
     if(sleep_inside_enclave != SELF_MONITOR){
         if(sleep_inside_enclave == AEX_SELF_MONITOR || sleep_inside_enclave == AEX_ASM_SELF_MONITOR){
