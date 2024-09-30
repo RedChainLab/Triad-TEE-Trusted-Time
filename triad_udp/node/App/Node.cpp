@@ -169,8 +169,22 @@ inline void set_thread_affinity(int core_id) {
     std::cout<<"[utrst]> Core "<<sched_getcpu()<<std::endl;
 }
 
+static int loop_recvfrom(int enclave_id, uint16_t port)
+{
+    printf("[utrst]> ENode listen starting...\r\n");
+    int retval = 0;
+    sgx_status_t ret = ecall_loop_recvfrom(enclave_id, &retval, port);
+    if (ret != SGX_SUCCESS) 
+    {
+        print_error_message(ret);
+    }
+    printf("[utrst]> ENode listen finished.\r\n");
+    return retval;
+}
+
 static int start(int enclave_id, uint16_t port, int core_id)
 {
+    printf("[utrst]> ENode logic starting...\r\n");
     set_thread_affinity(core_id);
     int retval = 0;
     sgx_status_t ret = ecall_start(enclave_id, &retval, port);
@@ -207,6 +221,7 @@ Node::Node(uint16_t _port, int _core_rdTSC) : port(_port), core_rdTSC(_core_rdTS
     }
     std::cout << getPrefix() << "Node initialized" << std::endl;
 
+    threads.emplace_back(loop_recvfrom, enclave_id, port);
     threads.emplace_back(start, enclave_id, port, core_rdTSC);
 }
 

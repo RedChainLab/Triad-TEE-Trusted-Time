@@ -41,6 +41,7 @@ enclave {
         public int ecall_init(uint16_t port);
         public int ecall_stop(uint16_t port);
         public int ecall_start(uint16_t port);
+        public int ecall_loop_recvfrom(uint16_t port);
         public int ecall_add_sibling(uint16_t port, [in, string] const char* sibling_ip, uint16_t sibling_port);
     };
 
