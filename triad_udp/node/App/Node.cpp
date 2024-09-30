@@ -200,8 +200,8 @@ Node::Node(uint16_t _port, int _core_rdTSC) : port(_port), core_rdTSC(_core_rdTS
 {
     /* Configuration for Switchless SGX */
     sgx_uswitchless_config_t us_config = SGX_USWITCHLESS_CONFIG_INITIALIZER;
-    us_config.num_uworkers = 1;
-    us_config.num_tworkers = 1;
+    us_config.num_uworkers = 3;
+    us_config.num_tworkers = 4;
 
     /* Initialize the enclave */
     if (initialize_enclave(&us_config) < 0) 
