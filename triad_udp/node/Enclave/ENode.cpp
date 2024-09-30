@@ -463,7 +463,7 @@ void ENode::monitor(int sleep_time, int verbosity){
     while (!should_stop())
     {    
         reference=0;
-        long long int start_tsc=rdtsc();
+        long long int start_tsc=rdtscp();
         long long int stop_tsc=3000000*sleep_time+start_tsc;
         asm volatile(
             "movq %0, %%r8\n\t"
