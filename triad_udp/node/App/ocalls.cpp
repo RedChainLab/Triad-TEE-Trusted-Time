@@ -31,9 +31,14 @@ void ocall_sleep(int sec) {
     /*
     Sleep for sec seconds outside the enclave
     */
-    //printf("Sleeping for %d seconds outside the enclave...\r\n", *sec);
     sleep(sec);
-    //printf("Done sleeping outside the enclave\r\n");
+}
+
+void ocall_usleep(int usec) {
+    /*
+    Sleep for usec microseconds outside the enclave
+    */
+    usleep(usec);
 }
 
 #ifdef __cplusplus
