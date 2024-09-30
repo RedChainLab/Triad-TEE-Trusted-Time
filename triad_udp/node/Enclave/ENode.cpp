@@ -505,6 +505,11 @@ void ENode::monitor(int sleep_time, int verbosity){
 int ENode::add_sibling(std::string hostname, uint16_t _port)
 {
     eprintf("Adding sibling %s:%d to node...\r\n", hostname, _port);
+    if(hostname=="127.0.0.1"&&_port==port)
+    {
+        eprintf("Won't add self as a sibling.\r\n");
+        return SUCCESS;
+    }
     if(std::find(siblings.begin(), siblings.end(), std::make_pair(hostname, _port)) != siblings.end())
     {
         eprintf("Sibling already added.\r\n");
