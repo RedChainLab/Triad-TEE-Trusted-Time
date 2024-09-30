@@ -11,51 +11,64 @@ int ecall_init(uint16_t _port)
     printf("%sInitializing enclave node...\r\n", ENCLAVE_MGR);
     if(nodes.find(_port) != nodes.end())
     {
-        printf("%sNode already exists.\r\n", ENCLAVE_MGR);
+        printf("%sENode already exists.\r\n", ENCLAVE_MGR);
         return SOCKET_ALREADY_EXISTS;
     }
-    printf("%sNode does not exist yet. Creating...\r\n", ENCLAVE_MGR);
+    printf("%sENode does not exist yet. Creating...\r\n", ENCLAVE_MGR);
     nodes.emplace(_port, new ENode(_port));
     return SUCCESS;
 }
 
 int ecall_stop(uint16_t _port)
 {
-    printf("%sStopping enclave...\r\n", ENCLAVE_MGR);
+    printf("%sStopping ENode...\r\n", ENCLAVE_MGR);
     if(nodes.find(_port) == nodes.end())
     {
-        printf("%sNode does not exist.\r\n", ENCLAVE_MGR);
+        printf("%sENode does not exist.\r\n", ENCLAVE_MGR);
         return SOCKET_ALREADY_EXISTS;
     }
-    delete nodes[_port];
-    nodes.erase(_port);
+    nodes[_port]->stop_tasks();
     printf("%sEnclave stopped.\r\n", ENCLAVE_MGR);
     return SUCCESS;
 }
 
-int ecall_start(uint16_t _port)
+int ecall_destroy(uint16_t _port)
 {
-    printf("%sStarting enclave logic...\r\n", ENCLAVE_MGR);
+    printf("%sDestroying ENode...\r\n", ENCLAVE_MGR);
+    if(nodes.find(_port) == nodes.end())
+    {
+        printf("%sENode does not exist.\r\n", ENCLAVE_MGR);
+        return SOCKET_ALREADY_EXISTS;
+    }
+    delete nodes[_port];
+    nodes.erase(_port);
+    printf("%sENode destroyed.\r\n", ENCLAVE_MGR);
+    return SUCCESS;
+}
+
+int ecall_monitor(uint16_t _port)
+{
+    printf("%sStarting enclave monitoring...\r\n", ENCLAVE_MGR);
     if(nodes.find(_port) == nodes.end())
     {
         printf("%sNode does not exist...\r\n", ENCLAVE_MGR);
         return SOCKET_ALREADY_EXISTS;
     }
     nodes[_port]->monitor(500, 7, 2);
-    printf("%sEnclave logic started.\r\n", ENCLAVE_MGR);
+    printf("%sEnclave monitoring finished.\r\n", ENCLAVE_MGR);
     return SUCCESS;
 }
 
 int ecall_loop_recvfrom(uint16_t _port)
 {
-    printf("%sStarting enclave logic...\r\n", ENCLAVE_MGR);
+    printf("%sStarting enclave recvfrom...\r\n", ENCLAVE_MGR);
     if(nodes.find(_port) == nodes.end())
     {
         printf("%sNode does not exist...\r\n", ENCLAVE_MGR);
         return SOCKET_ALREADY_EXISTS;
     }
     nodes[_port]->loop_recvfrom();
-    printf("%sEnclave logic started.\r\n", ENCLAVE_MGR);
+    printf("%sEnclave recvfrom finished.\r\n", ENCLAVE_MGR);
     return SUCCESS;
 }
 
@@ -69,6 +82,19 @@ int ecall_refresh(uint16_t _port)
     }
     nodes[_port]->refresh();
     printf("%sEnclave refresh finished.\r\n", ENCLAVE_MGR);
+    return SUCCESS;
+}
+
+int ecall_untaint_trigger(uint16_t _port)
+{
+    printf("%sStarting untainting trigger...\r\n", ENCLAVE_MGR);
+    if(nodes.find(_port) == nodes.end())
+    {
+        printf("%sNode does not exist...\r\n", ENCLAVE_MGR);
+        return SOCKET_ALREADY_EXISTS;
+    }
+    nodes[_port]->untaint_trigger();
+    printf("%sUntainting trigger finished.\r\n", ENCLAVE_MGR);
     return SUCCESS;
 }
 

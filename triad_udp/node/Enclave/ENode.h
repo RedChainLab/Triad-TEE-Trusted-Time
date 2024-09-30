@@ -113,6 +113,8 @@ public:
     void monitor(int sleep_time, int sleep_inside_enclave, int verbosity);
     int loop_recvfrom();
     void refresh();
+    void untaint_trigger();
+    void stop_tasks();
 
     int add_sibling(std::string hostname, uint16_t port);
 
@@ -130,6 +132,8 @@ private:
     bool isCounting;
     bool monitor_stopped;
     bool refresh_stopped;
+    bool trigger_stopped;
+    bool readfrom_stopped;
 
     bool should_stop();
 

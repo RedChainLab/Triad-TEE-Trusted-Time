@@ -66,6 +66,9 @@ typedef enum {
     AEX_ASM_SELF_MONITOR = 7
 }sleep_type_t;
 
+#define TAINTED_STR "Tainted"
+#define UNTAINTING_STR "Untaint"
+
 std::map<int /*port*/, ENode*> nodes;
 
 static void printArray(long long int *arr, long long int size, long long int reference){
@@ -162,6 +165,22 @@ void ENode::loopOReadTSC(void){
     sgx_unregister_aex_handler(counter_aex_handler);
 }
 
+void ENode::untaint_trigger()
+{
+    while(!should_stop())
+    {
+        sgx_thread_mutex_lock(&tainted_mutex);
+        if(tainted)
+        {
+            sgx_thread_cond_signal(&tainted_cond);
+        }
+        sgx_thread_mutex_unlock(&tainted_mutex);
+        ocall_sleep(1);
+    }
+    trigger_stopped = true;
+    eprintf("Untainting trigger stopped.\r\n");
+}
+
 void ENode::refresh()
 {
     while(!should_stop())
@@ -176,16 +195,22 @@ void ENode::refresh()
         }
         else if(tainted)
         {
+            sgx_thread_mutex_unlock(&tainted_mutex);
             eprintf("Untainting\r\n");
-            for(auto& sibling : siblings)
+            for(long unsigned int i=0; i < siblings.size() && tainted; i++)
             {
-                eprintf("Sending untainting message to %s:%d\r\n", sibling.first.c_str(), sibling.second);
-                sendMessage("Tainted", sibling.first.c_str(), sibling.second);
+                eprintf("Sending untaint to %s:%d\r\n", siblings[i].first.c_str(), siblings[i].second);
+                sendMessage(TAINTED_STR,siblings[i].first.c_str(), siblings[i].second);
+                ocall_usleep(100000);
             }
         }
-        sgx_thread_mutex_unlock(&tainted_mutex);
+        else
+        {
+            sgx_thread_mutex_unlock(&tainted_mutex);
+        }
     }
     refresh_stopped = true;
+    eprintf("Refresh stopped.\r\n");
 }
 
 void ENode::loopEReadTSC(void){
@@ -203,7 +228,7 @@ void ENode::loopEReadTSC(void){
     sgx_unregister_aex_handler(counter_aex_handler);
 }
 
-ENode::ENode(int _port):port(_port), stop(false), add_count(0), aex_count(0), monitor_aex_count(0), sock(-1), isCounting(false), monitor_stopped(false), refresh_stopped(false)
+ENode::ENode(int _port):port(_port), stop(false), add_count(0), aex_count(0), monitor_aex_count(0), sock(-1), isCounting(false), monitor_stopped(false), refresh_stopped(false), trigger_stopped(false)
 {
     eprintf("Creating ENode instance...\r\n");
     memset(count_aex, 0, sizeof(count_aex));
@@ -231,28 +256,37 @@ ENode::ENode(int _port):port(_port), stop(false), add_count(0), aex_count(0), mo
     eprintf("ENode instance created.\r\n");
 }
 
-ENode::~ENode()
+void ENode::stop_tasks()
 {
-    eprintf("Destroying ENode instance...\r\n");
+    eprintf("Stopping ENode instance...\r\n");
     print_siblings();
+    eprintf("Sending stop...\r\n");
     sgx_thread_rwlock_wrlock(&stop_rwlock);
     stop=true;
     sgx_thread_rwlock_unlock(&stop_rwlock);
-    while(!monitor_stopped);
-    sgx_thread_rwlock_destroy(&stop_rwlock);
-
+    while(!monitor_stopped&&!readfrom_stopped);
+    eprintf("Monitor and readfrom tasks stopped.\r\n");
+    eprintf("Signalling refresh to stop.\r\n");
     sgx_thread_mutex_lock(&tainted_mutex);
     sgx_thread_cond_signal(&tainted_cond);
     sgx_thread_mutex_unlock(&tainted_mutex);
-    while(!refresh_stopped);
-    sgx_thread_mutex_destroy(&tainted_mutex);
-
-    eprintf("ENode instance stopping...\r\n");
+    while(!refresh_stopped && !trigger_stopped);
+    eprintf("Refresh and untaint trigger stopped.\r\n");
+    eprintf("Closing socket...\r\n");
     sgx_thread_rwlock_wrlock(&socket_rwlock);
     close(sock);
+    sock = -1;
     sgx_thread_rwlock_unlock(&socket_rwlock);
+    eprintf("ENode tasks stopped.\r\n");
+}
+
+ENode::~ENode()
+{
+    sgx_thread_mutex_destroy(&tainted_mutex);
+    sgx_thread_cond_destroy(&tainted_cond);
+    sgx_thread_cond_destroy(&untainted_cond);
+    sgx_thread_rwlock_destroy(&stop_rwlock);
     sgx_thread_rwlock_destroy(&socket_rwlock);
-    eprintf("ENode instance destroyed.\r\n");
 }
 
 void ENode::eprintf(const char *fmt, ...)
@@ -392,6 +426,7 @@ int ENode::loop_recvfrom()
             } else {
                 eprintf("reading error...: %d\r\n", errno);
                 close(sock);
+                sock = -1;
                 return READING_ERROR;
             }
         }
@@ -402,6 +437,8 @@ int ENode::loop_recvfrom()
             retval=handle_message(buff, ip, (uint16_t)cport);
         }
     }
+    readfrom_stopped = true;
+    eprintf("ENode listen stopped.\r\n");
     return retval;
 }
 
@@ -416,9 +453,10 @@ int ENode::sendMessage(const char* buff, const char* ip, uint16_t cport)
     ssize_t sendStatus = sendto(sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, cport);
     sgx_thread_rwlock_unlock(&socket_rwlock);
     if (sendStatus < 0) {
-        eprintf("sending error...: %d\r\n", errno);
-        sgx_thread_rwlock_rdlock(&socket_rwlock);
+        eprintf("sending error on socket %d...: %d\r\n", sock, errno);
+        sgx_thread_rwlock_wrlock(&socket_rwlock);
         close(sock);
+        sock = -1;
         sgx_thread_rwlock_unlock(&socket_rwlock);
         return SENDING_ERROR;
     }
@@ -441,13 +479,15 @@ int ENode::handle_message(char* buff, char* ip, uint16_t cport)
             eprintf("Sibling already added.\r\n");
         }
     }
-    else if(strcmp(buff, "Tainted")==0)
+    else if(strcmp(buff, TAINTED_STR)==0)
     {
         eprintf("Tainted message received from %s:%d\r\n", ip, cport);
-        ocall_sleep(2);
-        retval=sendMessage("Untaint", ip, cport);
+        if(!tainted)
+        {
+            retval=sendMessage(UNTAINTING_STR, ip, cport);
+        }
     }
-    else if(strcmp(buff, "Untaint")==0)
+    else if(strcmp(buff, UNTAINTING_STR)==0)
     {
         eprintf("Untainting message received from %s:%d\r\n", ip, cport);
         sgx_thread_mutex_lock(&tainted_mutex);
@@ -631,8 +671,8 @@ void ENode::monitor(int sleep_time, int sleep_inside_enclave, int verbosity){
             sgx_unregister_aex_handler(monitor_aex_handler);
         }
     }
-    eprintf("Monitoring done: %s\r\n", tainted?"Tainted":"Not tainted");
     monitor_stopped = true;
+    eprintf("Monitoring done.\r\n");
 }
 
 int ENode::add_sibling(std::string hostname, uint16_t _port)

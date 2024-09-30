@@ -195,17 +195,30 @@ static int loop_refresh(int enclave_id, uint16_t port)
     return retval;
 }
 
-static int start(int enclave_id, uint16_t port, int core_id)
+static int loop_untaint_trigger(int enclave_id, uint16_t port)
 {
-    printf("[utrst]> ENode logic starting...\r\n");
-    set_thread_affinity(core_id);
+    printf("[utrst]> ENode untaint trigger starting...\r\n");
     int retval = 0;
-    sgx_status_t ret = ecall_start(enclave_id, &retval, port);
+    sgx_status_t ret = ecall_untaint_trigger(enclave_id, &retval, port);
     if (ret != SGX_SUCCESS) 
     {
         print_error_message(ret);
     }
-    printf("[utrst]> ENode start finished.\r\n");
+    printf("[utrst]> ENode untaint trigger finished.\r\n");
+    return retval;
+}
+
+static int monitor(int enclave_id, uint16_t port, int core_id)
+{
+    printf("[utrst]> Starting ENode monitoring...\r\n");
+    set_thread_affinity(core_id);
+    int retval = 0;
+    sgx_status_t ret = ecall_monitor(enclave_id, &retval, port);
+    if (ret != SGX_SUCCESS) 
+    {
+        print_error_message(ret);
+    }
+    printf("[utrst]> ENode monitor finished.\r\n");
     return retval;
 }
 
@@ -235,8 +248,9 @@ Node::Node(uint16_t _port, int _core_rdTSC) : port(_port), core_rdTSC(_core_rdTS
     std::cout << getPrefix() << "Node initialized" << std::endl;
 
     threads.emplace_back(loop_recvfrom, enclave_id, port);
+    threads.emplace_back(loop_untaint_trigger, enclave_id, port);
     threads.emplace_back(loop_refresh, enclave_id, port);
-    threads.emplace_back(start, enclave_id, port, core_rdTSC);
+    threads.emplace_back(monitor, enclave_id, port, core_rdTSC);
 }
 
 Node::~Node() 
@@ -249,7 +263,7 @@ Node::~Node()
     {
         print_error_message(ret);
     }
-    std::cout << getPrefix() << "ENode destroyed." << std::endl;
+    std::cout << getPrefix() << "ENode stopped." << std::endl;
     std::cout << getPrefix() << "Joining threads..." << std::endl;
     for(auto& thread : this->threads)
     {
@@ -265,6 +279,13 @@ Node::~Node()
         }
     }
     std::cout << getPrefix() << "Threads joined." << std::endl;
+    std::cout << getPrefix() << "Destroying ENode..." << std::endl;
+    ret = ecall_destroy(enclave_id, &retvalue, port);
+    if (ret != SGX_SUCCESS) 
+    {
+        print_error_message(ret);
+    }
+    std::cout << getPrefix() << "ENode destroyed." << std::endl;
     if (enclave_id != 0) 
     {
         sgx_destroy_enclave(enclave_id);
