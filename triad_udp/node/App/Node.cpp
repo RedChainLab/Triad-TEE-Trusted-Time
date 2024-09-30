@@ -182,6 +182,19 @@ static int loop_recvfrom(int enclave_id, uint16_t port)
     return retval;
 }
 
+static int loop_refresh(int enclave_id, uint16_t port)
+{
+    printf("[utrst]> ENode refresh starting...\r\n");
+    int retval = 0;
+    sgx_status_t ret = ecall_refresh(enclave_id, &retval, port);
+    if (ret != SGX_SUCCESS) 
+    {
+        print_error_message(ret);
+    }
+    printf("[utrst]> ENode refresh finished.\r\n");
+    return retval;
+}
+
 static int start(int enclave_id, uint16_t port, int core_id)
 {
     printf("[utrst]> ENode logic starting...\r\n");
@@ -222,6 +235,7 @@ Node::Node(uint16_t _port, int _core_rdTSC) : port(_port), core_rdTSC(_core_rdTS
     std::cout << getPrefix() << "Node initialized" << std::endl;
 
     threads.emplace_back(loop_recvfrom, enclave_id, port);
+    threads.emplace_back(loop_refresh, enclave_id, port);
     threads.emplace_back(start, enclave_id, port, core_rdTSC);
 }
 

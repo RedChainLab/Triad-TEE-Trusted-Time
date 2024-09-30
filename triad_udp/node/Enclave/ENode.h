@@ -67,6 +67,12 @@ enum {
 typedef struct {
     int port;
     long long int* add_count;
+    long long int* mem_add_count;
+
+    bool* tainted;
+    sgx_thread_mutex_t* tainted_mutex;
+    sgx_thread_cond_t* tainted_cond;
+
     long long int* aex_count;
     long long int* monitor_aex_count;
 
@@ -83,6 +89,9 @@ public:
     long long int add_count;
     long long int tsc;
 
+    bool tainted;
+    long long int mem_add_count;
+
     long long int aex_count;
     long long int monitor_aex_count;
 
@@ -92,6 +101,10 @@ public:
     sgx_thread_rwlock_t stop_rwlock;
     sgx_thread_rwlock_t socket_rwlock;
 
+    sgx_thread_mutex_t tainted_mutex;
+    sgx_thread_cond_t tainted_cond;
+    sgx_thread_cond_t untainted_cond;
+
     aex_handler_args_t aex_args;
 
     void countAdd();
@@ -99,6 +112,7 @@ public:
     void loopEReadTSC();
     void monitor(int sleep_time, int sleep_inside_enclave, int verbosity);
     int loop_recvfrom();
+    void refresh();
 
     int add_sibling(std::string hostname, uint16_t port);
 
@@ -115,12 +129,14 @@ private:
 
     bool isCounting;
     bool monitor_stopped;
+    bool refresh_stopped;
 
     bool should_stop();
 
     int setup_socket();
 
     int handle_message(char* buff, char* ip, uint16_t port);
+    int sendMessage(const char* buff, const char* ip, uint16_t port);
 
     void incrementNonce();
     int encrypt(const unsigned char* plaintext, const unsigned long long plen, unsigned char* ciphertext, unsigned long long* clen);

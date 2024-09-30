@@ -27,12 +27,12 @@ void ocall_readTSC(long long* ts) {
     #endif
 }
 
-void ocall_sleep(int* sec) {
+void ocall_sleep(int sec) {
     /*
     Sleep for sec seconds outside the enclave
     */
     //printf("Sleeping for %d seconds outside the enclave...\r\n", *sec);
-    sleep(*sec);
+    sleep(sec);
     //printf("Done sleeping outside the enclave\r\n");
 }
 

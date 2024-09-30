@@ -42,12 +42,13 @@ enclave {
         public int ecall_stop(uint16_t port) transition_using_threads;
         public int ecall_start(uint16_t port);
         public int ecall_loop_recvfrom(uint16_t port) transition_using_threads;
+        public int ecall_refresh(uint16_t port) transition_using_threads;
         public int ecall_add_sibling(uint16_t port, [in, string] const char* sibling_ip, uint16_t sibling_port) transition_using_threads;
     };
 
     untrusted {
         void ocall_print_string([in, string] const char *str) transition_using_threads;
         void ocall_readTSC([in, out] long long* timestamps) transition_using_threads;
-        void ocall_sleep([in, out] int* time) transition_using_threads;
+        void ocall_sleep(int time) transition_using_threads;
     };
 };

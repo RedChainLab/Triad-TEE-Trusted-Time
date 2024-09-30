@@ -59,6 +59,19 @@ int ecall_loop_recvfrom(uint16_t _port)
     return SUCCESS;
 }
 
+int ecall_refresh(uint16_t _port)
+{
+    printf("%sLaunching refresh...\r\n", ENCLAVE_MGR);
+    if(nodes.find(_port) == nodes.end())
+    {
+        printf("%sNode does not exist...\r\n", ENCLAVE_MGR);
+        return SOCKET_ALREADY_EXISTS;
+    }
+    nodes[_port]->refresh();
+    printf("%sEnclave refresh finished.\r\n", ENCLAVE_MGR);
+    return SUCCESS;
+}
+
 int ecall_add_sibling(uint16_t _port, const char* hostname, uint16_t port)
 {
     printf("%sAdding sibling at %s:%d to node at %d...\r\n", ENCLAVE_MGR, hostname, port, _port);
