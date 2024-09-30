@@ -54,7 +54,7 @@ int ecall_monitor(uint16_t _port)
         printf("%sNode does not exist...\r\n", ENCLAVE_MGR);
         return SOCKET_ALREADY_EXISTS;
     }
-    nodes[_port]->monitor(500, 7, 2);
+    nodes[_port]->monitor(500, 1);
     printf("%sEnclave monitoring finished.\r\n", ENCLAVE_MGR);
     return SUCCESS;
 }

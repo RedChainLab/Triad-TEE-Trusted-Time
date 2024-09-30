@@ -107,10 +107,7 @@ public:
 
     aex_handler_args_t aex_args;
 
-    void countAdd();
-    void loopOReadTSC();
-    void loopEReadTSC();
-    void monitor(int sleep_time, int sleep_inside_enclave, int verbosity);
+    void monitor(int sleep_time, int verbosity);
     int loop_recvfrom();
     void refresh();
     void untaint_trigger();
