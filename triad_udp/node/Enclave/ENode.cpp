@@ -407,13 +407,6 @@ void ENode::monitor(int sleep_time, int sleep_inside_enclave, int verbosity){
     /*
     the main thread that will be called by the application.
     */ 
-
-    /*
-    * KNOWN ISSUE: Trying to run multiple same handlers in the same execution will block execution, maybe it crashes the enclave.
-    * Having only one handler in the execution works.
-    * -> Turns out, whenever an AEX occured, it had problems with arguments: removing them, it works.
-    * Remains to see how to safely pass arguments to the handler....
-    */
     sgx_aex_mitigation_node_t node;
     if(sleep_inside_enclave != SELF_MONITOR){
         if(sleep_inside_enclave == AEX_SELF_MONITOR || sleep_inside_enclave == AEX_ASM_SELF_MONITOR){
