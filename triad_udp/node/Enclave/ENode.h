@@ -126,7 +126,6 @@ private:
 
     std::vector<std::pair<std::string, uint16_t>> siblings;
 
-    bool isCounting;
     bool monitor_stopped;
     bool refresh_stopped;
     bool trigger_stopped;

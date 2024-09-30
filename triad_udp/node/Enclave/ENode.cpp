@@ -110,7 +110,7 @@ static void aex_handler(const sgx_exception_info_t *info, const void * args)
     log_aex(aex_args->count_aex, *(aex_args->aex_count), aex_args->add_count);
 }
 
-inline long long int rdtsc(void){
+inline long long int rdtscp(void){
     /*
     Read the TSC register
     */
@@ -168,7 +168,7 @@ void ENode::refresh()
     eprintf("Refresh stopped.\r\n");
 }
 
-ENode::ENode(int _port):port(_port), stop(false), add_count(0), aex_count(0), monitor_aex_count(0), sock(-1), isCounting(false), monitor_stopped(false), refresh_stopped(false), trigger_stopped(false)
+ENode::ENode(int _port):port(_port), stop(false), add_count(0), aex_count(0), monitor_aex_count(0), sock(-1), monitor_stopped(false), refresh_stopped(false), trigger_stopped(false)
 {
     eprintf("Creating ENode instance...\r\n");
     memset(count_aex, 0, sizeof(count_aex));
@@ -470,7 +470,7 @@ void ENode::monitor(int sleep_time, int verbosity){
             "movq %1, %%r9\n\t"
             "movq $0, %%r10\n\t"
 
-            "1: rdtsc\n\t"
+            "1: rdtscp\n\t"
             "shlq $32, %%rdx\n\t"
             "orq %%rax, %%rdx\n\t"
             "incq %%r10\n\t"
@@ -482,7 +482,6 @@ void ENode::monitor(int sleep_time, int verbosity){
             : "rax", "rdx", "r8", "r9"
         );
 
-        this->isCounting = false;
         eprintf("Monitoring (%s)...\r\n", tainted?"Tainted":"Not tainted");
         if(verbosity>=1)
         {
