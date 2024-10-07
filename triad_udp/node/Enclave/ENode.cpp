@@ -188,6 +188,13 @@ ENode::ENode(int _port):port(_port), stop(false), add_count(0), aex_count(0), mo
     aex_args.count_aex = count_aex;
     aex_args.monitor_aex = monitor_aex;
 
+    incrementNonce();
+    //randombytes_buf(key, sizeof(key));
+    const char* test_key = "b52c505a37d78eda5dd34f20c22540ea1b58963cf8e5bf8ffa85f9f2492505b4";
+    sodium_hex2bin(key, crypto_aead_aes256gcm_KEYBYTES,
+                       test_key, strlen(test_key),
+                       NULL, NULL, NULL);
+
     sgx_thread_mutex_init(&tainted_mutex, NULL);
     sgx_thread_rwlock_init(&stop_rwlock, NULL);
     sgx_thread_rwlock_init(&socket_rwlock, NULL);
@@ -259,21 +266,20 @@ void ENode::incrementNonce(void)
     }
     else
     {
-        for(unsigned int i = 0; i < crypto_aead_aes256gcm_NPUBBYTES; i++)
+        /*for(unsigned int i = 0; i < crypto_aead_aes256gcm_NPUBBYTES; i++)
         {
             nonce[i]++;
             if(nonce[i] != 0)
             {
                 break;
             }
-        }
+        }*/
     }
 }
 
 int ENode::encrypt(const unsigned char* plaintext, const unsigned long long plen, unsigned char* ciphertext, unsigned long long* clen)
 {
     incrementNonce();
-    randombytes_buf(key, sizeof(key));
 
     crypto_aead_aes256gcm_encrypt(ciphertext, clen,
                                   plaintext, plen,
@@ -373,8 +379,21 @@ int ENode::loop_recvfrom()
         else if(readStatus > 0)
         {
             //eprintf("encl_recvfrom: %d, %p, %d, %d, %s, %d\r\n", sock, buff, sizeof(buff), 0, ip, cport);
-            eprintf("Message received from %s:%d: %s\r\n", ip, cport, buff);
-            retval=handle_message(buff, sizeof(buff), ip, (uint16_t)cport);
+            eprintf("loop_recvfrom: Message received from %s:%d if len %d: %s\r\n", ip, cport, readStatus, buff);
+
+            unsigned char buff_dec[sizeof(buff)];
+            unsigned long long buff_len_dec = sizeof(buff);
+            retval=decrypt((unsigned char*)buff, readStatus, buff_dec, &buff_len_dec);
+            if(retval)
+            {
+                eprintf("loop_recvfrom: Decryption failed.\r\n");
+            }
+            else
+            {
+                eprintf("loop_recvfrom: Decrypted message: %s\r\n", buff_dec);
+            }
+
+            retval=handle_message(buff_dec, buff_len_dec, ip, (uint16_t)cport);
         }
     }
     readfrom_stopped = true;
@@ -390,7 +409,19 @@ int ENode::sendMessage(const void* buff, size_t buff_len, const char* ip, uint16
         sgx_thread_rwlock_unlock(&socket_rwlock);
         return SOCKET_INEXISTENT;
     }
-    ssize_t sendStatus = sendto(sock, buff, buff_len, 0, ip, INET_ADDRSTRLEN, cport);
+    unsigned char buff_enc[buff_len + crypto_aead_aes256gcm_ABYTES];
+    unsigned long long buff_len_enc = buff_len + crypto_aead_aes256gcm_ABYTES;
+    int retval=encrypt((const unsigned char*)buff, buff_len, buff_enc, &buff_len_enc);
+    eprintf("sendMessage: Encrypting message to %s:%d: %s\r\n", ip, cport, buff);
+    if(retval)
+    {
+        eprintf("sendMessage: Encryption failed.\r\n");
+    }
+    else
+    {
+        eprintf("sendMessage: Encrypted message of len %d: %s\r\n", buff_len_enc, buff_enc);
+    }
+    ssize_t sendStatus = sendto(sock, buff_enc, buff_len_enc, 0, ip, INET_ADDRSTRLEN, cport);
     sgx_thread_rwlock_unlock(&socket_rwlock);
     if (sendStatus < 0) {
         eprintf("sending error on socket %d...: %d\r\n", sock, errno);
@@ -528,9 +559,23 @@ int ENode::add_sibling(std::string hostname, uint16_t _port)
     }
     siblings.emplace_back(hostname, _port);
     eprintf("Sibling added.\r\n");
+
     const char* buff = "Sibling";
+    size_t buff_len = strlen(buff);
+    unsigned char buff_enc[buff_len + crypto_aead_aes256gcm_ABYTES];
+    unsigned long long buff_len_enc = buff_len + crypto_aead_aes256gcm_ABYTES;
+    int retval=encrypt((const unsigned char*)buff, buff_len, buff_enc, &buff_len_enc);
+    eprintf("addSibling: Encrypting message to %s:%d: %s\r\n", hostname.c_str(), _port, buff);
+    if(retval)
+    {
+        eprintf("addSibling: Encryption failed.\r\n");
+    }
+    else
+    {
+        eprintf("addSibling: Encrypted message of len %d: %s\r\n", buff_len_enc, buff_enc);
+    }
     //eprintf("sento: %d, %s, %d, %d, %s, %d\r\n", sock, buff, sizeof(buff), 0, hostname.c_str(), _port);
-    ssize_t sendStatus = sendto(sock, buff, sizeof(buff), 0, hostname.c_str(), INET_ADDRSTRLEN, _port);
+    ssize_t sendStatus = sendto(sock, buff_enc, buff_len_enc, 0, hostname.c_str(), INET_ADDRSTRLEN, _port);
     if (sendStatus< 0) {
         eprintf("sending error...: %d\r\n", errno);
         sgx_thread_rwlock_wrlock(&socket_rwlock);
