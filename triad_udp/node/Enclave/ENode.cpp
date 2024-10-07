@@ -188,6 +188,14 @@ ENode::ENode(int _port):port(_port), stop(false), add_count(0), aex_count(0), mo
     aex_args.count_aex = count_aex;
     aex_args.monitor_aex = monitor_aex;
 
+    tsc=0;
+    tsc_freq = 3;
+
+    ocall_timespec_get(&ts_ref);
+    eprintf("Reference time: %ld.%09ld\r\n", ts_ref.tv_sec, ts_ref.tv_nsec);
+    ts_curr = ts_ref;
+    tsc_ref = rdtscp();
+    
     incrementNonce();
     //randombytes_buf(key, sizeof(key));
     const char* test_key = "b52c505a37d78eda5dd34f20c22540ea1b58963cf8e5bf8ffa85f9f2492505b4";
@@ -412,7 +420,7 @@ int ENode::sendMessage(const void* buff, size_t buff_len, const char* ip, uint16
     unsigned char buff_enc[buff_len + crypto_aead_aes256gcm_ABYTES];
     unsigned long long buff_len_enc = buff_len + crypto_aead_aes256gcm_ABYTES;
     int retval=encrypt((const unsigned char*)buff, buff_len, buff_enc, &buff_len_enc);
-    eprintf("sendMessage: Encrypting message to %s:%d: %s\r\n", ip, cport, buff);
+    eprintf("sendMessage: Encrypting message to %s:%d of len %d: %s\r\n", ip, cport, buff_len, buff);
     if(retval)
     {
         eprintf("sendMessage: Encryption failed.\r\n");
@@ -463,7 +471,17 @@ int ENode::handle_message(const void* buff, size_t buff_len, char* ip, uint16_t 
             eprintf("Tainted message received from %s:%d\r\n", ip, cport);
             if(!tainted)
             {
-                retval=sendMessage(UNTAINTING_STR, strlen(UNTAINTING_STR), ip, cport);
+                timespec timestamp;
+                long long total_nsec = (long long)((double)(tsc-tsc_ref)/tsc_freq);
+                timestamp.tv_sec = (total_nsec+ts_ref.tv_nsec)/1000000000;
+                timestamp.tv_sec += ts_ref.tv_sec;
+                timestamp.tv_nsec = (total_nsec+ts_ref.tv_nsec)%1000000000; 
+                eprintf("Sending untainting ts: %ld.%ld\r\n", timestamp.tv_sec, timestamp.tv_nsec);
+                ocall_timespec_print(&timestamp);
+                char send_buff[1024] = {0};
+                memcpy(send_buff, UNTAINTING_STR, strlen(UNTAINTING_STR));
+                memcpy(send_buff+strlen(UNTAINTING_STR), &timestamp, sizeof(timespec));
+                retval=sendMessage(send_buff, strlen(UNTAINTING_STR)+sizeof(timespec), ip, cport);
             }
             break;
         }
@@ -471,6 +489,10 @@ int ENode::handle_message(const void* buff, size_t buff_len, char* ip, uint16_t 
         {
             eprintf("Untainting message received from %s:%d\r\n", ip, cport);
             sgx_thread_mutex_lock(&tainted_mutex);
+            timespec timestamp;
+            timestamp = *(const timespec*)((const char*)buff+strlen(UNTAINTING_STR));
+            eprintf("Untainting with ts: %ld.%ld\r\n", timestamp.tv_sec, timestamp.tv_nsec);
+            ocall_timespec_print(&timestamp);
             tainted = false;
             sgx_thread_cond_signal(&untainted_cond);
             sgx_thread_mutex_unlock(&tainted_mutex);
@@ -512,16 +534,18 @@ void ENode::monitor(int sleep_time, int verbosity){
             "movq %0, %%r8\n\t"
             "movq %1, %%r9\n\t"
             "movq $0, %%r10\n\t"
+            "movq %2, %%r11\n\t"
 
             "1: rdtscp\n\t"
             "shlq $32, %%rdx\n\t"
             "orq %%rax, %%rdx\n\t"
+            "movq %%rdx, (%%r11)\n\t"
             "incq %%r10\n\t"
             "movq %%r10, (%%r8)\n\t"
             "cmpq %%r9, %%rdx\n\t"
             "jl 1b\n\t"
             :
-            : "r"(&add_count), "r"(stop_tsc)
+            : "r"(&add_count), "r"(stop_tsc), "r"(&tsc)
             : "rax", "rdx", "r8", "r9"
         );
 

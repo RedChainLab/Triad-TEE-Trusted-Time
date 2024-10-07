@@ -87,7 +87,6 @@ public:
     bool stop;
 
     long long int add_count;
-    long long int tsc;
 
     bool tainted;
     long long int mem_add_count;
@@ -120,6 +119,13 @@ public:
 
 private:
     int sock;
+
+    long long tsc;
+    double tsc_freq;
+
+    long long tsc_ref;
+    timespec ts_ref;
+    timespec ts_curr;
 
     unsigned char nonce[crypto_aead_aes256gcm_NPUBBYTES];
     unsigned char key[crypto_aead_aes256gcm_KEYBYTES];
