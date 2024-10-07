@@ -155,7 +155,7 @@ void ENode::refresh()
             for(long unsigned int i=0; i < siblings.size() && tainted; i++)
             {
                 eprintf("Sending untaint to %s:%d\r\n", siblings[i].first.c_str(), siblings[i].second);
-                sendMessage(TAINTED_STR,siblings[i].first.c_str(), siblings[i].second);
+                sendMessage(TAINTED_STR, strlen(TAINTED_STR), siblings[i].first.c_str(), siblings[i].second);
                 ocall_usleep(100000);
             }
         }
@@ -374,7 +374,7 @@ int ENode::loop_recvfrom()
         {
             //eprintf("encl_recvfrom: %d, %p, %d, %d, %s, %d\r\n", sock, buff, sizeof(buff), 0, ip, cport);
             eprintf("Message received from %s:%d: %s\r\n", ip, cport, buff);
-            retval=handle_message(buff, ip, (uint16_t)cport);
+            retval=handle_message(buff, sizeof(buff), ip, (uint16_t)cport);
         }
     }
     readfrom_stopped = true;
@@ -382,7 +382,7 @@ int ENode::loop_recvfrom()
     return retval;
 }
 
-int ENode::sendMessage(const char* buff, const char* ip, uint16_t cport)
+int ENode::sendMessage(const void* buff, size_t buff_len, const char* ip, uint16_t cport)
 {
     sgx_thread_rwlock_rdlock(&socket_rwlock);
     if(sock < 0)
@@ -390,7 +390,7 @@ int ENode::sendMessage(const char* buff, const char* ip, uint16_t cport)
         sgx_thread_rwlock_unlock(&socket_rwlock);
         return SOCKET_INEXISTENT;
     }
-    ssize_t sendStatus = sendto(sock, buff, sizeof(buff), 0, ip, INET_ADDRSTRLEN, cport);
+    ssize_t sendStatus = sendto(sock, buff, buff_len, 0, ip, INET_ADDRSTRLEN, cport);
     sgx_thread_rwlock_unlock(&socket_rwlock);
     if (sendStatus < 0) {
         eprintf("sending error on socket %d...: %d\r\n", sock, errno);
@@ -403,41 +403,53 @@ int ENode::sendMessage(const char* buff, const char* ip, uint16_t cport)
     return SUCCESS;
 }
 
-int ENode::handle_message(char* buff, char* ip, uint16_t cport)
+int ENode::handle_message(const void* buff, size_t buff_len, char* ip, uint16_t cport)
 {
     int retval = SUCCESS;
-    if(strcmp(buff, "Sibling")==0)
+    if(buff_len == 0)
     {
-        eprintf("Sibling message received from %s:%d\r\n", ip, cport);
-        if(std::find(siblings.begin(), siblings.end(), std::make_pair(std::string(ip), cport)) == siblings.end())
-        {
-            siblings.emplace_back(ip, cport);
-            eprintf("Sibling added.\r\n");
-        }
-        else
-        {
-            eprintf("Sibling already added.\r\n");
-        }
+        eprintf("Empty message received from %s:%d\r\n", ip, cport);
+        return retval;
     }
-    else if(strcmp(buff, TAINTED_STR)==0)
+    switch(((const char*)buff)[0])
     {
-        eprintf("Tainted message received from %s:%d\r\n", ip, cport);
-        if(!tainted)
+        case 'S':
         {
-            retval=sendMessage(UNTAINTING_STR, ip, cport);
+            eprintf("Sibling message received from %s:%d\r\n", ip, cport);
+            if(std::find(siblings.begin(), siblings.end(), std::make_pair(std::string(ip), cport)) == siblings.end())
+            {
+                siblings.emplace_back(ip, cport);
+                eprintf("Sibling added.\r\n");
+            }
+            else
+            {
+                eprintf("Sibling already added.\r\n");
+            }
+            break;
         }
-    }
-    else if(strcmp(buff, UNTAINTING_STR)==0)
-    {
-        eprintf("Untainting message received from %s:%d\r\n", ip, cport);
-        sgx_thread_mutex_lock(&tainted_mutex);
-        tainted = false;
-        sgx_thread_cond_signal(&untainted_cond);
-        sgx_thread_mutex_unlock(&tainted_mutex);
-    }
-    else
-    {
-        retval=sendMessage(buff, ip, cport);
+        case 'T':
+        {
+            eprintf("Tainted message received from %s:%d\r\n", ip, cport);
+            if(!tainted)
+            {
+                retval=sendMessage(UNTAINTING_STR, strlen(UNTAINTING_STR), ip, cport);
+            }
+            break;
+        }
+        case 'U':
+        {
+            eprintf("Untainting message received from %s:%d\r\n", ip, cport);
+            sgx_thread_mutex_lock(&tainted_mutex);
+            tainted = false;
+            sgx_thread_cond_signal(&untainted_cond);
+            sgx_thread_mutex_unlock(&tainted_mutex);
+            break;
+        }
+        default:
+        {
+            retval=sendMessage(buff, buff_len, ip, cport);
+            break;
+        }
     }
     return retval;
 }

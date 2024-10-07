@@ -135,8 +135,8 @@ private:
 
     int setup_socket();
 
-    int handle_message(char* buff, char* ip, uint16_t port);
-    int sendMessage(const char* buff, const char* ip, uint16_t port);
+    int handle_message(const void* buff, size_t buff_len, char* ip, uint16_t port);
+    int sendMessage(const void* buff, size_t buff_len, const char* ip, uint16_t port);
 
     void incrementNonce();
     int encrypt(const unsigned char* plaintext, const unsigned long long plen, unsigned char* ciphertext, unsigned long long* clen);
