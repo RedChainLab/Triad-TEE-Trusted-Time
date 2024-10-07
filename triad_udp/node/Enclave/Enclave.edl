@@ -53,5 +53,7 @@ enclave {
         void ocall_readTSC([in, out] long long* timestamps) transition_using_threads;
         void ocall_sleep(int time) transition_using_threads;
         void ocall_usleep(int time) transition_using_threads;
+        void ocall_timespec_get([out] struct timespec* ts) transition_using_threads;
+        void ocall_timespec_print([in] struct timespec* ts) transition_using_threads;
     };
 };
