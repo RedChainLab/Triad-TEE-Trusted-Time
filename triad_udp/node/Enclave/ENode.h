@@ -88,6 +88,7 @@ public:
 
     long long int add_count;
 
+    bool calibrated;
     bool tainted;
     long long int mem_add_count;
 
@@ -127,6 +128,8 @@ private:
     timespec ts_ref;
     timespec ts_curr;
 
+    long long add_count_ref;
+
     unsigned char nonce[crypto_aead_aes256gcm_NPUBBYTES];
     unsigned char key[crypto_aead_aes256gcm_KEYBYTES];
 
@@ -140,6 +143,9 @@ private:
     bool should_stop();
 
     int setup_socket();
+
+    bool calibrate();
+    bool monitor_rdtsc(int sleep_time);
 
     int handle_message(const void* buff, size_t buff_len, char* ip, uint16_t port);
     int sendMessage(const void* buff, size_t buff_len, const char* ip, uint16_t port);

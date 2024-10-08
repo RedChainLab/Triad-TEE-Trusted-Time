@@ -148,7 +148,7 @@ void ENode::refresh()
             sgx_thread_mutex_unlock(&tainted_mutex);
             break;
         }
-        else if(tainted)
+        else if(tainted && calibrated)
         {
             sgx_thread_mutex_unlock(&tainted_mutex);
             eprintf("Untainting\r\n");
@@ -157,6 +157,11 @@ void ENode::refresh()
                 eprintf("Sending untaint to %s:%d\r\n", siblings[i].first.c_str(), siblings[i].second);
                 sendMessage(TAINTED_STR, strlen(TAINTED_STR), siblings[i].first.c_str(), siblings[i].second);
                 ocall_usleep(100000);
+            }
+            if(tainted)
+            {
+                eprintf("Peer untainting failed.\r\n");
+                calibrated = false;
             }
         }
         else
@@ -168,7 +173,7 @@ void ENode::refresh()
     eprintf("Refresh stopped.\r\n");
 }
 
-ENode::ENode(int _port):port(_port), stop(false), add_count(0), aex_count(0), monitor_aex_count(0), sock(-1), monitor_stopped(false), refresh_stopped(false), trigger_stopped(false)
+ENode::ENode(int _port):port(_port), stop(false), add_count(0), calibrated(false), tainted(true), aex_count(0), monitor_aex_count(0), sock(-1), monitor_stopped(false), refresh_stopped(false), trigger_stopped(false)
 {
     eprintf("Creating ENode instance...\r\n");
     memset(count_aex, 0, sizeof(count_aex));
@@ -187,14 +192,6 @@ ENode::ENode(int _port):port(_port), stop(false), add_count(0), aex_count(0), mo
     aex_args.monitor_aex_count = &monitor_aex_count;
     aex_args.count_aex = count_aex;
     aex_args.monitor_aex = monitor_aex;
-
-    tsc=0;
-    tsc_freq = 3;
-
-    ocall_timespec_get(&ts_ref);
-    eprintf("Reference time: %ld.%09ld\r\n", ts_ref.tv_sec, ts_ref.tv_nsec);
-    ts_curr = ts_ref;
-    tsc_ref = rdtscp();
     
     incrementNonce();
     //randombytes_buf(key, sizeof(key));
@@ -517,6 +514,68 @@ void ENode::print_siblings()
     printf("\r\n");
 }
 
+bool ENode::calibrate()
+{
+    int NB_RUNS=10;
+    tsc_freq = 3;
+    long long int add_count_sum = 0;
+    long long int add_count_mem = add_count_sum;
+    for(int i=1; i<=NB_RUNS; i++)
+    {
+        add_count_mem = add_count_sum;
+        monitor_rdtsc(500);
+        add_count_sum += add_count;
+        if(add_count_sum < add_count_mem)
+        {
+            eprintf("Overflow detected!\r\n");
+            return false;
+        }
+        add_count_ref = add_count_sum/i;
+    }
+
+    ocall_timespec_get(&ts_ref);
+    eprintf("Calibrating...\r\n");
+    eprintf("Reference time: %ld.%09ld\r\n", ts_ref.tv_sec, ts_ref.tv_nsec);
+    ts_curr = ts_ref;
+    tsc_ref = rdtscp();
+    eprintf("Reference TSC: %lld\r\n", tsc_ref);
+    eprintf("Calibration done.\r\n");
+    calibrated = true;
+    tainted = false;
+    return true;
+}
+
+bool ENode::monitor_rdtsc(int sleep_time)
+{
+    long long int start_tsc=rdtscp();
+    long long int stop_tsc=3000000*sleep_time+start_tsc;
+    asm volatile(
+        "movq %0, %%r8\n\t"
+        "movq %1, %%r9\n\t"
+        "movq $0, %%r10\n\t"
+        "movq %2, %%r11\n\t"
+
+        "1: rdtscp\n\t"
+        "shlq $32, %%rdx\n\t"
+        "orq %%rax, %%rdx\n\t"
+        "movq %%rdx, (%%r11)\n\t"
+        "incq %%r10\n\t"
+        "movq %%r10, (%%r8)\n\t"
+        "cmpq %%r9, %%rdx\n\t"
+        "jl 1b\n\t"
+        :
+        : "r"(&add_count), "r"(stop_tsc), "r"(&tsc)
+        : "rax", "rdx", "r8", "r9"
+    );
+    if((double)add_count>(double)add_count_ref*1.1 
+    || (double)add_count<(double)add_count_ref*0.9)
+    {
+        eprintf("Discalibrated!\r\n");
+        calibrated = false;
+    }
+    return calibrated;
+}
+
 void ENode::monitor(int sleep_time, int verbosity){
     /*
     the main thread that will be called by the application.
@@ -527,27 +586,13 @@ void ENode::monitor(int sleep_time, int verbosity){
     long long int reference = 0;
     while (!should_stop())
     {    
+        if(!calibrated)
+        {
+            calibrate();
+            continue;
+        }
         reference=0;
-        long long int start_tsc=rdtscp();
-        long long int stop_tsc=3000000*sleep_time+start_tsc;
-        asm volatile(
-            "movq %0, %%r8\n\t"
-            "movq %1, %%r9\n\t"
-            "movq $0, %%r10\n\t"
-            "movq %2, %%r11\n\t"
-
-            "1: rdtscp\n\t"
-            "shlq $32, %%rdx\n\t"
-            "orq %%rax, %%rdx\n\t"
-            "movq %%rdx, (%%r11)\n\t"
-            "incq %%r10\n\t"
-            "movq %%r10, (%%r8)\n\t"
-            "cmpq %%r9, %%rdx\n\t"
-            "jl 1b\n\t"
-            :
-            : "r"(&add_count), "r"(stop_tsc), "r"(&tsc)
-            : "rax", "rdx", "r8", "r9"
-        );
+        monitor_rdtsc(sleep_time);
 
         eprintf("Monitoring (%s)...\r\n", tainted?"Tainted":"Not tainted");
         if(verbosity>=1)
