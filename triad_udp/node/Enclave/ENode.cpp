@@ -567,8 +567,9 @@ bool ENode::monitor_rdtsc(int sleep_time)
         : "r"(&add_count), "r"(stop_tsc), "r"(&tsc)
         : "rax", "rdx", "r8", "r9"
     );
-    if((double)add_count>(double)add_count_ref*1.1 
-    || (double)add_count<(double)add_count_ref*0.9)
+    double ACCURACY=0.001;
+    if((double)add_count>(double)add_count_ref*(1+ACCURACY)
+    || (double)add_count<(double)add_count_ref*(1-ACCURACY))
     {
         eprintf("Discalibrated!\r\n");
         calibrated = false;
