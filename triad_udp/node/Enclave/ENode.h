@@ -69,6 +69,8 @@ typedef struct {
     long long int* add_count;
     long long int* mem_add_count;
 
+    long long int* total_aex_count;
+
     bool* tainted;
     sgx_thread_mutex_t* tainted_mutex;
     sgx_thread_cond_t* tainted_cond;
@@ -87,6 +89,7 @@ public:
     bool stop;
 
     long long int add_count;
+    long long int total_aex_count;
 
     bool calibrated;
     bool tainted;
@@ -147,10 +150,13 @@ private:
     int setup_socket();
 
     bool calibrate();
+    bool calibrate_drift();
     bool monitor_rdtsc(int sleep_time);
 
     int handle_message(const void* buff, size_t buff_len, char* ip, uint16_t port);
     int sendMessage(const void* buff, size_t buff_len, const char* ip, uint16_t port);
+
+    void send_recv_drift_message(int sleep_time_ms);
 
     void incrementNonce();
     int encrypt(const unsigned char* plaintext, const unsigned long long plen, unsigned char* ciphertext, unsigned long long* clen);

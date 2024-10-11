@@ -101,9 +101,9 @@ static void aex_handler(const sgx_exception_info_t *info, const void * args)
     const aex_handler_args_t* aex_args=(const aex_handler_args_t*)args;
     *aex_args->tainted = true;
     *aex_args->mem_add_count = *aex_args->add_count;
-
+    *aex_args->total_aex_count += 1;
     sgx_thread_mutex_lock(aex_args->tainted_mutex);
-    printf("[Handler %d]> AEX\r\n", aex_args->port);
+    printf("[Handler %d]> AEX %lld\r\n", aex_args->port, *aex_args->total_aex_count);
     sgx_thread_cond_signal(aex_args->tainted_cond);
     sgx_thread_mutex_unlock(aex_args->tainted_mutex);
 
@@ -173,7 +173,7 @@ void ENode::refresh()
     eprintf("Refresh stopped.\r\n");
 }
 
-ENode::ENode(int _port):port(_port), stop(false), add_count(0), calibrated(false), tainted(true), aex_count(0), monitor_aex_count(0), sock(-1), monitor_stopped(false), refresh_stopped(false), trigger_stopped(false)
+ENode::ENode(int _port):port(_port), stop(false), add_count(0), total_aex_count(0), calibrated(false), tainted(true), aex_count(0), monitor_aex_count(0), sock(-1), monitor_stopped(false), refresh_stopped(false), trigger_stopped(false)
 {
     eprintf("Creating ENode instance...\r\n");
     memset(count_aex, 0, sizeof(count_aex));
@@ -183,6 +183,8 @@ ENode::ENode(int _port):port(_port), stop(false), add_count(0), calibrated(false
 
     aex_args.add_count = &add_count;
     aex_args.mem_add_count = &mem_add_count;
+
+    aex_args.total_aex_count = &total_aex_count;
 
     aex_args.tainted = &tainted;
     aex_args.tainted_mutex = &tainted_mutex;
@@ -533,6 +535,9 @@ bool ENode::calibrate()
         }
         add_count_ref = add_count_sum/i;
     }
+    eprintf("Calibrating drift...\r\n");
+    calibrate_drift();
+    eprintf("Measured TSC frequency: %f\r\n", tsc_freq);
 
     ocall_timespec_get(&ts_ref);
     eprintf("Reference time: %ld.%09ld\r\n", ts_ref.tv_sec, ts_ref.tv_nsec);
@@ -543,6 +548,69 @@ bool ENode::calibrate()
     calibrated = true;
     tainted = false;
     return true;
+}
+
+bool ENode::calibrate_drift()
+{
+    long long int mem_total_aex_count;
+    long long int mem_tsc;
+    long long int start_tsc;
+    int sleep_time_ms=1000;
+    int NB_RUNS=10;
+    long long int tsc_tbl[NB_RUNS];
+    for(int i=0; i<NB_RUNS;)
+    {
+        eprintf("Sending drift slow message %d...\r\n", i+1);
+        mem_total_aex_count=total_aex_count;
+        start_tsc=rdtscp();
+        send_recv_drift_message(sleep_time_ms);
+        mem_tsc=rdtscp();
+        tsc_tbl[i]=mem_tsc-start_tsc;
+
+        i+=(total_aex_count==mem_total_aex_count)?1:0;
+    }
+    long double avg_tsc_slow_count=0;
+    for(int i=0; i<NB_RUNS; i++)
+    {
+        long double mem_avg_tsc_count=avg_tsc_slow_count;
+        avg_tsc_slow_count+=(long double)tsc_tbl[i];
+        if(avg_tsc_slow_count<mem_avg_tsc_count)
+        {
+            eprintf("Overflow detected!\r\n");
+            return false;
+        }
+    }
+    avg_tsc_slow_count/=NB_RUNS;
+    for(int i=0; i<NB_RUNS;)
+    {
+        eprintf("Sending drift fast message %d...\r\n", i+1);
+        mem_total_aex_count=total_aex_count;
+        start_tsc=rdtscp();
+        send_recv_drift_message(0);
+        mem_tsc=rdtscp();
+        tsc_tbl[i]=mem_tsc-start_tsc;
+
+        i+=(total_aex_count==mem_total_aex_count)?1:0;
+    }
+    long double avg_tsc_fast_count=0;
+    for(int i=0; i<NB_RUNS; i++)
+    {
+        long double mem_avg_tsc_count=avg_tsc_fast_count;
+        avg_tsc_fast_count+=(long double)tsc_tbl[i];
+        if(avg_tsc_fast_count<mem_avg_tsc_count)
+        {
+            eprintf("Overflow detected!\r\n");
+            return false;
+        }
+    }
+    avg_tsc_fast_count/=NB_RUNS;
+    tsc_freq=(double)(avg_tsc_slow_count-avg_tsc_fast_count)/(1000000*sleep_time_ms);
+    return true;
+}
+
+void ENode::send_recv_drift_message(int sleep_time_ms)
+{
+    ocall_usleep(1000*sleep_time_ms);
 }
 
 bool ENode::monitor_rdtsc(int sleep_time)
