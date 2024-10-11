@@ -353,9 +353,16 @@ std::string Node::getPrefix()
     return "[Node "+std::to_string(port)+"]> ";
 }
 
-int Node::get_timestamp()
+timespec Node::get_timestamp()
 {
-    return 0;
+    timespec ts;
+    int retval = 0;
+    sgx_status_t ret = ecall_get_timestamp(enclave_id, &retval, port, &ts);
+    if (ret != SGX_SUCCESS) 
+    {
+        print_error_message(ret);
+    }
+    return ts;
 }
 
 int Node::add_sibling(const std::string& hostname, uint16_t _port)

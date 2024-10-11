@@ -115,6 +115,8 @@ public:
 
     int add_sibling(std::string hostname, uint16_t port);
 
+    timespec get_timestamp();
+
     ENode(int _port);
     ~ENode();
 

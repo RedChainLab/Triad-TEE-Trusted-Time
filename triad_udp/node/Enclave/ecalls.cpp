@@ -110,3 +110,16 @@ int ecall_add_sibling(uint16_t _port, const char* hostname, uint16_t port)
     printf("%sSibling at %s:%d added to node at %d.\r\n", ENCLAVE_MGR, hostname, port, _port);
     return SUCCESS;
 }
+
+int ecall_get_timestamp(uint16_t _port, struct timespec* ts)
+{
+    printf("%sGetting timestamp...\r\n", ENCLAVE_MGR);
+    if(nodes.find(_port) == nodes.end())
+    {
+        printf("%sNode does not exist...\r\n", ENCLAVE_MGR);
+        return SOCKET_ALREADY_EXISTS;
+    }
+    *ts = nodes[_port]->get_timestamp();
+    printf("%sTimestamp retrieved.\r\n", ENCLAVE_MGR);
+    return SUCCESS;
+}

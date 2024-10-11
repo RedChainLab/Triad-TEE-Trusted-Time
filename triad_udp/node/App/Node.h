@@ -13,7 +13,7 @@ class Node {
 public:
     static Node* get_instance(uint16_t port, int core_rdTSC);
     static void destroy_instance(uint16_t port);
-    int get_timestamp();
+    timespec get_timestamp();
     int add_sibling(const std::string& hostname, uint16_t port);
 private:
     uint16_t port;

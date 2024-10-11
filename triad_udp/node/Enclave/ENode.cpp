@@ -516,6 +516,7 @@ void ENode::print_siblings()
 
 bool ENode::calibrate()
 {
+    eprintf("Calibrating...\r\n");
     int NB_RUNS=10;
     tsc_freq = 3;
     long long int add_count_sum = 0;
@@ -534,7 +535,6 @@ bool ENode::calibrate()
     }
 
     ocall_timespec_get(&ts_ref);
-    eprintf("Calibrating...\r\n");
     eprintf("Reference time: %ld.%09ld\r\n", ts_ref.tv_sec, ts_ref.tv_nsec);
     ts_curr = ts_ref;
     tsc_ref = rdtscp();
@@ -654,4 +654,16 @@ int ENode::add_sibling(std::string hostname, uint16_t _port)
         return SENDING_ERROR;
     }
     return SUCCESS;
+}
+
+timespec ENode::get_timestamp()
+{
+    long long int mem_tsc=tsc;
+    while(mem_tsc==tsc && !calibrated && tainted && !should_stop());
+    timespec timestamp;
+    long long total_nsec = (long long)((double)(tsc-tsc_ref)/tsc_freq);
+    timestamp.tv_sec = (total_nsec+ts_ref.tv_nsec)/1000000000;
+    timestamp.tv_sec += ts_ref.tv_sec;
+    timestamp.tv_nsec = (total_nsec+ts_ref.tv_nsec)%1000000000; 
+    return timestamp;
 }

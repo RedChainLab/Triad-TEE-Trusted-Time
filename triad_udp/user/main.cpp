@@ -23,6 +23,26 @@ int main(int argc, char* argv[]) {
     std::string msg;
     std::cin >> msg;
 
+    for (int i = 0; i < 10; i++) {
+        timespec ts;
+        timespec_get(&ts, TIME_UTC);
+        timespec ts1 = node->get_timestamp();
+        timespec ts2 = node2->get_timestamp();
+        timespec ts3 = node3->get_timestamp();
+        char buff[100];
+        strftime(buff, sizeof buff, "%D %T", gmtime(&(ts.tv_sec)));
+        printf("[utrst]> Time: %s.%09ld UTC\n", buff, ts.tv_nsec);
+        strftime(buff, sizeof buff, "%D %T", gmtime(&(ts1.tv_sec)));
+        printf("[utrst]> Time: %s.%09ld UTC\n", buff, ts1.tv_nsec);
+        strftime(buff, sizeof buff, "%D %T", gmtime(&(ts2.tv_sec)));
+        printf("[utrst]> Time: %s.%09ld UTC\n", buff, ts2.tv_nsec);
+        strftime(buff, sizeof buff, "%D %T", gmtime(&(ts3.tv_sec)));
+        printf("[utrst]> Time: %s.%09ld UTC\n", buff, ts3.tv_nsec);       
+    }
+
+    std::cout << "<Enter anything to continue>"<< std::endl;
+    std::cin >> msg;
+
     for (int i = 3; i < argc; i += 2) {
         node->add_sibling(argv[i], atoi(argv[i+1]));
         node2->add_sibling(argv[i], atoi(argv[i+1]));
