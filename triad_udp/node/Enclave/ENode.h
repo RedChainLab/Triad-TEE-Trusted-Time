@@ -110,7 +110,7 @@ public:
 
     aex_handler_args_t aex_args;
 
-    void monitor(int sleep_time, int verbosity);
+    void monitor();
     int loop_recvfrom();
     void refresh();
     void untaint_trigger();
@@ -125,6 +125,9 @@ public:
 
 private:
     int sock;
+
+    int sleep_time;
+    int verbosity;
 
     long long tsc;
     double tsc_freq;
@@ -151,7 +154,7 @@ private:
 
     bool calibrate();
     bool calibrate_drift();
-    bool monitor_rdtsc(int sleep_time);
+    bool monitor_rdtsc();
 
     int handle_message(const void* buff, size_t buff_len, char* ip, uint16_t port);
     int sendMessage(const void* buff, size_t buff_len, const char* ip, uint16_t port);

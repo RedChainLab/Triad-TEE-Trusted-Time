@@ -152,12 +152,17 @@ void ENode::refresh()
         {
             sgx_thread_mutex_unlock(&tainted_mutex);
             eprintf("Untainting\r\n");
-            for(long unsigned int i=0; i < siblings.size() && tainted; i++)
+            long long int mem_total_aex_count;
+            do
             {
-                eprintf("Sending untaint to %s:%d\r\n", siblings[i].first.c_str(), siblings[i].second);
-                sendMessage(TAINTED_STR, strlen(TAINTED_STR), siblings[i].first.c_str(), siblings[i].second);
+                mem_total_aex_count=total_aex_count;
+                for(long unsigned int i=0; i < siblings.size() && tainted; i++)
+                {
+                    eprintf("Sending untaint to %s:%d\r\n", siblings[i].first.c_str(), siblings[i].second);
+                    sendMessage(TAINTED_STR, strlen(TAINTED_STR), siblings[i].first.c_str(), siblings[i].second);
+                }
                 ocall_usleep(100000);
-            }
+            } while (mem_total_aex_count!=total_aex_count);
             if(tainted)
             {
                 eprintf("Peer untainting failed.\r\n");
@@ -173,7 +178,11 @@ void ENode::refresh()
     eprintf("Refresh stopped.\r\n");
 }
 
-ENode::ENode(int _port):port(_port), stop(false), add_count(0), total_aex_count(0), calibrated(false), tainted(true), aex_count(0), monitor_aex_count(0), sock(-1), monitor_stopped(false), refresh_stopped(false), trigger_stopped(false)
+ENode::ENode(int _port):port(_port), stop(false), 
+    add_count(0), total_aex_count(0), calibrated(false), 
+    tainted(true), aex_count(0), monitor_aex_count(0), 
+    sock(-1), sleep_time(50), verbosity(0), 
+    monitor_stopped(false), refresh_stopped(false), trigger_stopped(false)
 {
     eprintf("Creating ENode instance...\r\n");
     memset(count_aex, 0, sizeof(count_aex));
@@ -386,7 +395,7 @@ int ENode::loop_recvfrom()
         else if(readStatus > 0)
         {
             //eprintf("encl_recvfrom: %d, %p, %d, %d, %s, %d\r\n", sock, buff, sizeof(buff), 0, ip, cport);
-            eprintf("loop_recvfrom: Message received from %s:%d if len %d: %s\r\n", ip, cport, readStatus, buff);
+            if(verbosity>=2) eprintf("loop_recvfrom: Message received from %s:%d if len %d: %s\r\n", ip, cport, readStatus, buff);
 
             unsigned char buff_dec[sizeof(buff)];
             unsigned long long buff_len_dec = sizeof(buff);
@@ -397,7 +406,7 @@ int ENode::loop_recvfrom()
             }
             else
             {
-                eprintf("loop_recvfrom: Decrypted message: %s\r\n", buff_dec);
+                if(verbosity>=2) eprintf("loop_recvfrom: Decrypted message: %s\r\n", buff_dec);
             }
 
             retval=handle_message(buff_dec, buff_len_dec, ip, (uint16_t)cport);
@@ -419,14 +428,14 @@ int ENode::sendMessage(const void* buff, size_t buff_len, const char* ip, uint16
     unsigned char buff_enc[buff_len + crypto_aead_aes256gcm_ABYTES];
     unsigned long long buff_len_enc = buff_len + crypto_aead_aes256gcm_ABYTES;
     int retval=encrypt((const unsigned char*)buff, buff_len, buff_enc, &buff_len_enc);
-    eprintf("sendMessage: Encrypting message to %s:%d of len %d: %s\r\n", ip, cport, buff_len, buff);
+    if(verbosity>=2) eprintf("sendMessage: Encrypting message to %s:%d of len %d: %s\r\n", ip, cport, buff_len, buff);
     if(retval)
     {
         eprintf("sendMessage: Encryption failed.\r\n");
     }
     else
     {
-        eprintf("sendMessage: Encrypted message of len %d: %s\r\n", buff_len_enc, buff_enc);
+        if(verbosity>=2) eprintf("sendMessage: Encrypted message of len %d: %s\r\n", buff_len_enc, buff_enc);
     }
     ssize_t sendStatus = sendto(sock, buff_enc, buff_len_enc, 0, ip, INET_ADDRSTRLEN, cport);
     sgx_thread_rwlock_unlock(&socket_rwlock);
@@ -453,21 +462,21 @@ int ENode::handle_message(const void* buff, size_t buff_len, char* ip, uint16_t 
     {
         case 'S':
         {
-            eprintf("Sibling message received from %s:%d\r\n", ip, cport);
+            if(verbosity>=2) eprintf("Sibling message received from %s:%d\r\n", ip, cport);
             if(std::find(siblings.begin(), siblings.end(), std::make_pair(std::string(ip), cport)) == siblings.end())
             {
                 siblings.emplace_back(ip, cport);
-                eprintf("Sibling added.\r\n");
+                if(verbosity>=2) eprintf("Sibling added.\r\n");
             }
             else
             {
-                eprintf("Sibling already added.\r\n");
+                if(verbosity>=2) eprintf("Sibling already added.\r\n");
             }
             break;
         }
         case 'T':
         {
-            eprintf("Tainted message received from %s:%d\r\n", ip, cport);
+            if(verbosity>=2) eprintf("Tainted message received from %s:%d\r\n", ip, cport);
             if(!tainted)
             {
                 timespec timestamp;
@@ -486,12 +495,28 @@ int ENode::handle_message(const void* buff, size_t buff_len, char* ip, uint16_t 
         }
         case 'U':
         {
-            eprintf("Untainting message received from %s:%d\r\n", ip, cport);
+            if(verbosity>=2) eprintf("Untainting message received from %s:%d\r\n", ip, cport);
             sgx_thread_mutex_lock(&tainted_mutex);
             timespec timestamp;
             timestamp = *(const timespec*)((const char*)buff+strlen(UNTAINTING_STR));
             eprintf("Untainting with ts: %ld.%ld\r\n", timestamp.tv_sec, timestamp.tv_nsec);
             ocall_timespec_print(&timestamp);
+            long long int mem_tsc=tsc;
+            while((mem_tsc==tsc || !calibrated) & !should_stop());
+            timespec curr_ts;
+            long long total_nsec = (long long)((double)(tsc-tsc_ref)/tsc_freq);
+            curr_ts.tv_sec = (total_nsec+ts_ref.tv_nsec)/1000000000;
+            curr_ts.tv_sec += ts_ref.tv_sec;
+            curr_ts.tv_nsec = (total_nsec+ts_ref.tv_nsec)%1000000000; 
+            if(timestamp.tv_sec>curr_ts.tv_sec || (timestamp.tv_sec==curr_ts.tv_sec && timestamp.tv_nsec > curr_ts.tv_nsec))
+            {
+                ts_ref=timestamp;
+            }
+            else
+            {
+                ts_ref=curr_ts;
+            }
+            tsc_ref=mem_tsc;
             tainted = false;
             sgx_thread_cond_signal(&untainted_cond);
             sgx_thread_mutex_unlock(&tainted_mutex);
@@ -526,7 +551,7 @@ bool ENode::calibrate()
     for(int i=1; i<=NB_RUNS; i++)
     {
         add_count_mem = add_count_sum;
-        monitor_rdtsc(500);
+        monitor_rdtsc();
         add_count_sum += add_count;
         if(add_count_sum < add_count_mem)
         {
@@ -613,7 +638,7 @@ void ENode::send_recv_drift_message(int sleep_time_ms)
     ocall_usleep(1000*sleep_time_ms);
 }
 
-bool ENode::monitor_rdtsc(int sleep_time)
+bool ENode::monitor_rdtsc()
 {
     long long int start_tsc=rdtscp();
     long long int stop_tsc=3000000*sleep_time+start_tsc;
@@ -635,17 +660,17 @@ bool ENode::monitor_rdtsc(int sleep_time)
         : "r"(&add_count), "r"(stop_tsc), "r"(&tsc)
         : "rax", "rdx", "r8", "r9"
     );
-    double ACCURACY=0.001;
-    if((double)add_count>(double)add_count_ref*(1+ACCURACY)
-    || (double)add_count<(double)add_count_ref*(1-ACCURACY))
+    double ACCURACY=0.01;
+    if(!tainted && ((double)add_count>(double)add_count_ref*(1+ACCURACY)
+    || (double)add_count<(double)add_count_ref*(1-ACCURACY)))
     {
-        eprintf("Discalibrated!\r\n");
+        eprintf("Discalibrated! %f %d %f\r\n",(double)add_count_ref*(1-ACCURACY),add_count,(double)add_count_ref*(1+ACCURACY));
         calibrated = false;
     }
     return calibrated;
 }
 
-void ENode::monitor(int sleep_time, int verbosity){
+void ENode::monitor(){
     /*
     the main thread that will be called by the application.
     */ 
@@ -661,11 +686,11 @@ void ENode::monitor(int sleep_time, int verbosity){
             continue;
         }
         reference=0;
-        monitor_rdtsc(sleep_time);
+        monitor_rdtsc();
 
-        eprintf("Monitoring (%s)...\r\n", tainted?"Tainted":"Not tainted");
         if(verbosity>=1)
         {
+            eprintf("Monitoring (%s)...\r\n", tainted?"Tainted":"Not tainted");
             printf("idx;count\r\n");
             printArray(count_aex, aex_count, reference);
             printf("%lld;%lld\r\n", aex_count, add_count-reference);
@@ -727,7 +752,7 @@ int ENode::add_sibling(std::string hostname, uint16_t _port)
 timespec ENode::get_timestamp()
 {
     long long int mem_tsc=tsc;
-    while(mem_tsc==tsc && !calibrated && tainted && !should_stop());
+    while((mem_tsc==tsc || !calibrated || tainted) && !should_stop());
     timespec timestamp;
     long long total_nsec = (long long)((double)(tsc-tsc_ref)/tsc_freq);
     timestamp.tv_sec = (total_nsec+ts_ref.tv_nsec)/1000000000;
