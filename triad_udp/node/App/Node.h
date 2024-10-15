@@ -14,6 +14,7 @@ public:
     static Node* get_instance(uint16_t port, int core_rdTSC);
     static void destroy_instance(uint16_t port);
     timespec get_timestamp();
+    void print_timestamp();
     int add_sibling(const std::string& hostname, uint16_t port);
 private:
     uint16_t port;

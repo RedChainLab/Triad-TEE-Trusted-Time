@@ -24,48 +24,21 @@ int main(int argc, char* argv[]) {
     std::string msg;
     std::cin >> msg;
 
-    for (int i = 0; i < 10; i++) {
-        timespec ts;
-        timespec ts_end;
-        timespec_get(&ts, TIME_UTC);
-        timespec ts1 = node->get_timestamp();
-        timespec ts2 = node2->get_timestamp();
-        timespec ts3 = node3->get_timestamp();
-        timespec_get(&ts_end, TIME_UTC);
-        char buff[100];
-        strftime(buff, sizeof buff, "%D %T", gmtime(&(ts.tv_sec)));
-        printf("[utrst]> Time: %s.%09ld UTC\n", buff, ts.tv_nsec);
-        strftime(buff, sizeof buff, "%D %T", gmtime(&(ts1.tv_sec)));
-        printf("[utrst]> Time: %s.%09ld UTC\n", buff, ts1.tv_nsec);
-        strftime(buff, sizeof buff, "%D %T", gmtime(&(ts2.tv_sec)));
-        printf("[utrst]> Time: %s.%09ld UTC\n", buff, ts2.tv_nsec);
-        strftime(buff, sizeof buff, "%D %T", gmtime(&(ts3.tv_sec)));
-        printf("[utrst]> Time: %s.%09ld UTC\n", buff, ts3.tv_nsec);       
-        strftime(buff, sizeof buff, "%D %T", gmtime(&(ts_end.tv_sec)));
-        printf("[utrst]> Time: %s.%09ld UTC\n", buff, ts_end.tv_nsec);    
-    }
+    do
+    {
+        node->print_timestamp();
+        node2->print_timestamp();
+        node3->print_timestamp();
 
-    std::cout << "<Enter anything to continue>"<< std::endl;
-    std::cin >> msg;
+        std::cout << "<Enter \"OK\" to proceed; anything else to reiterate>"<< std::endl;
+        std::cin >> msg;
+    } while(msg != "OK");
+
     sleep(60);
     {
-        timespec ts;
-        timespec ts_end;
-        timespec_get(&ts, TIME_UTC);
-        timespec ts1 = node->get_timestamp();
-        timespec ts2 = node2->get_timestamp();
-        timespec ts3 = node3->get_timestamp();
-        char buff[100];
-        strftime(buff, sizeof buff, "%D %T", gmtime(&(ts.tv_sec)));
-        printf("[utrst]> Time: %s.%09ld UTC\n", buff, ts.tv_nsec);
-        strftime(buff, sizeof buff, "%D %T", gmtime(&(ts1.tv_sec)));
-        printf("[utrst]> Time: %s.%09ld UTC\n", buff, ts1.tv_nsec);
-        strftime(buff, sizeof buff, "%D %T", gmtime(&(ts2.tv_sec)));
-        printf("[utrst]> Time: %s.%09ld UTC\n", buff, ts2.tv_nsec);
-        strftime(buff, sizeof buff, "%D %T", gmtime(&(ts3.tv_sec)));
-        printf("[utrst]> Time: %s.%09ld UTC\n", buff, ts3.tv_nsec);       
-        strftime(buff, sizeof buff, "%D %T", gmtime(&(ts_end.tv_sec)));
-        printf("[utrst]> Time: %s.%09ld UTC\n", buff, ts_end.tv_nsec);    
+        node->print_timestamp();
+        node2->print_timestamp();
+        node3->print_timestamp();    
     }
 
     std::cout << "<Enter anything to continue>"<< std::endl;

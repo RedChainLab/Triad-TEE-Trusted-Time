@@ -365,6 +365,18 @@ timespec Node::get_timestamp()
     return ts;
 }
 
+void Node::print_timestamp()
+{
+    timespec ts_node=this->get_timestamp();
+    timespec ts_ref;
+    timespec_get(&ts_ref, TIME_UTC);
+    char buff[100];
+    strftime(buff, sizeof buff, "%D %T", gmtime(&(ts_ref.tv_sec)));
+    printf("%s Ref. Time: %s.%09ld UTC\n", getPrefix().c_str(), buff, ts_ref.tv_nsec);
+    strftime(buff, sizeof buff, "%D %T", gmtime(&(ts_node.tv_sec)));
+    printf("%s Node Time: %s.%09ld UTC\n", getPrefix().c_str(), buff, ts_node.tv_nsec);
+}
+
 int Node::add_sibling(const std::string& hostname, uint16_t _port)
 {
     int retval = 0;
