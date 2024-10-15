@@ -91,7 +91,8 @@ public:
     long long int add_count;
     long long int total_aex_count;
 
-    bool calibrated;
+    bool calib_count;
+    bool calib_ts_ref;
     bool tainted;
     long long int mem_add_count;
 

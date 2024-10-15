@@ -148,7 +148,7 @@ void ENode::refresh()
             sgx_thread_mutex_unlock(&tainted_mutex);
             break;
         }
-        else if(tainted && calibrated)
+        else if(tainted && calib_count && calib_ts_ref)
         {
             sgx_thread_mutex_unlock(&tainted_mutex);
             eprintf("Untainting\r\n");
@@ -166,7 +166,7 @@ void ENode::refresh()
             if(tainted)
             {
                 eprintf("Peer untainting failed.\r\n");
-                calibrated = false;
+                calib_ts_ref = false;
             }
         }
         else
@@ -179,7 +179,7 @@ void ENode::refresh()
 }
 
 ENode::ENode(int _port):port(_port), stop(false), 
-    add_count(0), total_aex_count(0), calibrated(false), 
+    add_count(0), total_aex_count(0), calib_count(false), calib_ts_ref(false),
     tainted(true), aex_count(0), monitor_aex_count(0), 
     sock(-1), sleep_time(50), verbosity(0), 
     monitor_stopped(false), refresh_stopped(false), trigger_stopped(false)
@@ -502,7 +502,7 @@ int ENode::handle_message(const void* buff, size_t buff_len, char* ip, uint16_t 
             eprintf("Untainting with ts: %ld.%ld\r\n", timestamp.tv_sec, timestamp.tv_nsec);
             ocall_timespec_print(&timestamp);
             long long int mem_tsc=tsc;
-            while((mem_tsc==tsc || !calibrated) & !should_stop());
+            while((mem_tsc==tsc || !calib_count || !calib_ts_ref) & !should_stop());
             timespec curr_ts;
             long long total_nsec = (long long)((double)(tsc-tsc_ref)/tsc_freq);
             curr_ts.tv_sec = (total_nsec+ts_ref.tv_nsec)/1000000000;
@@ -544,33 +544,38 @@ void ENode::print_siblings()
 bool ENode::calibrate()
 {
     eprintf("Calibrating...\r\n");
-    int NB_RUNS=10;
-    tsc_freq = 3;
-    long long int add_count_sum = 0;
-    long long int add_count_mem = add_count_sum;
-    for(int i=1; i<=NB_RUNS; i++)
+    if(!calib_count)
     {
-        add_count_mem = add_count_sum;
-        monitor_rdtsc();
-        add_count_sum += add_count;
-        if(add_count_sum < add_count_mem)
+        int NB_RUNS=10;
+        long long int add_count_sum = 0;
+        long long int add_count_mem = add_count_sum;
+        for(int i=1; i<=NB_RUNS; i++)
         {
-            eprintf("Overflow detected!\r\n");
-            return false;
+            add_count_mem = add_count_sum;
+            monitor_rdtsc();
+            add_count_sum += add_count;
+            if(add_count_sum < add_count_mem)
+            {
+                eprintf("Overflow detected!\r\n");
+                return false;
+            }
+            add_count_ref = add_count_sum/i;
         }
-        add_count_ref = add_count_sum/i;
+        eprintf("Calibrating drift...\r\n");
+        calibrate_drift();
+        eprintf("Measured TSC frequency: %f\r\n", tsc_freq);
+        calib_count=true;
     }
-    eprintf("Calibrating drift...\r\n");
-    calibrate_drift();
-    eprintf("Measured TSC frequency: %f\r\n", tsc_freq);
-
-    ocall_timespec_get(&ts_ref);
-    eprintf("Reference time: %ld.%09ld\r\n", ts_ref.tv_sec, ts_ref.tv_nsec);
-    ts_curr = ts_ref;
-    tsc_ref = rdtscp();
-    eprintf("Reference TSC: %lld\r\n", tsc_ref);
+    if(!calib_ts_ref)
+    {
+        ocall_timespec_get(&ts_ref);
+        eprintf("Reference time: %ld.%09ld\r\n", ts_ref.tv_sec, ts_ref.tv_nsec);
+        ts_curr = ts_ref;
+        tsc_ref = rdtscp();
+        eprintf("Reference TSC: %lld\r\n", tsc_ref);
+        calib_ts_ref=true;
+    }
     eprintf("Calibration done.\r\n");
-    calibrated = true;
     tainted = false;
     return true;
 }
@@ -665,9 +670,9 @@ bool ENode::monitor_rdtsc()
     || (double)add_count<(double)add_count_ref*(1-ACCURACY)))
     {
         eprintf("Discalibrated! %f %d %f\r\n",(double)add_count_ref*(1-ACCURACY),add_count,(double)add_count_ref*(1+ACCURACY));
-        calibrated = false;
+        calib_count = false;
     }
-    return calibrated;
+    return calib_count;
 }
 
 void ENode::monitor(){
@@ -680,7 +685,7 @@ void ENode::monitor(){
     long long int reference = 0;
     while (!should_stop())
     {    
-        if(!calibrated)
+        if(!calib_count||!calib_ts_ref)
         {
             calibrate();
             continue;
@@ -752,7 +757,7 @@ int ENode::add_sibling(std::string hostname, uint16_t _port)
 timespec ENode::get_timestamp()
 {
     long long int mem_tsc=tsc;
-    while((mem_tsc==tsc || !calibrated || tainted) && !should_stop());
+    while((mem_tsc==tsc || !calib_count || !calib_ts_ref || tainted) && !should_stop());
     timespec timestamp;
     long long total_nsec = (long long)((double)(tsc-tsc_ref)/tsc_freq);
     timestamp.tv_sec = (total_nsec+ts_ref.tv_nsec)/1000000000;
