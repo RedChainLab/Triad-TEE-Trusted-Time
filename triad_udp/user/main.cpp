@@ -18,6 +18,7 @@ int main(int argc, char* argv[]) {
     usleep(10000);
     node->add_sibling("127.0.0.1", port+1);
     node->add_sibling("127.0.0.1", port+2);
+    node2->add_sibling("127.0.0.1", port+2);
 
     std::cout << "<Enter anything to continue>"<< std::endl;
     std::string msg;
@@ -25,10 +26,12 @@ int main(int argc, char* argv[]) {
 
     for (int i = 0; i < 10; i++) {
         timespec ts;
+        timespec ts_end;
         timespec_get(&ts, TIME_UTC);
         timespec ts1 = node->get_timestamp();
         timespec ts2 = node2->get_timestamp();
         timespec ts3 = node3->get_timestamp();
+        timespec_get(&ts_end, TIME_UTC);
         char buff[100];
         strftime(buff, sizeof buff, "%D %T", gmtime(&(ts.tv_sec)));
         printf("[utrst]> Time: %s.%09ld UTC\n", buff, ts.tv_nsec);
@@ -38,6 +41,8 @@ int main(int argc, char* argv[]) {
         printf("[utrst]> Time: %s.%09ld UTC\n", buff, ts2.tv_nsec);
         strftime(buff, sizeof buff, "%D %T", gmtime(&(ts3.tv_sec)));
         printf("[utrst]> Time: %s.%09ld UTC\n", buff, ts3.tv_nsec);       
+        strftime(buff, sizeof buff, "%D %T", gmtime(&(ts_end.tv_sec)));
+        printf("[utrst]> Time: %s.%09ld UTC\n", buff, ts_end.tv_nsec);    
     }
 
     std::cout << "<Enter anything to continue>"<< std::endl;
@@ -45,6 +50,7 @@ int main(int argc, char* argv[]) {
     sleep(60);
     {
         timespec ts;
+        timespec ts_end;
         timespec_get(&ts, TIME_UTC);
         timespec ts1 = node->get_timestamp();
         timespec ts2 = node2->get_timestamp();
@@ -58,6 +64,8 @@ int main(int argc, char* argv[]) {
         printf("[utrst]> Time: %s.%09ld UTC\n", buff, ts2.tv_nsec);
         strftime(buff, sizeof buff, "%D %T", gmtime(&(ts3.tv_sec)));
         printf("[utrst]> Time: %s.%09ld UTC\n", buff, ts3.tv_nsec);       
+        strftime(buff, sizeof buff, "%D %T", gmtime(&(ts_end.tv_sec)));
+        printf("[utrst]> Time: %s.%09ld UTC\n", buff, ts_end.tv_nsec);    
     }
 
     std::cout << "<Enter anything to continue>"<< std::endl;
