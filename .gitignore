@@ -19,3 +19,4 @@ tsc
 triad
 **.pem
 .vscode/settings.json
+**.log
