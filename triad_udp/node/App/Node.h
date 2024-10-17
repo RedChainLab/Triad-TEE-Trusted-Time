@@ -15,7 +15,9 @@ public:
     static void destroy_instance(uint16_t port);
     timespec get_timestamp();
     void print_timestamp();
+    void poll_timestamp(int count);
     int add_sibling(const std::string& hostname, uint16_t port);
+    bool stop;
 private:
     uint16_t port;
     int core_rdTSC;

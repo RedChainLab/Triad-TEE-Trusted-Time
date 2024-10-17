@@ -171,6 +171,7 @@ void ENode::refresh()
         }
         else
         {
+            eprintf("State (tainted, count, ts_ref)=(%d, %d, %d) not ready.\r\n", tainted, calib_count, calib_ts_ref);
             sgx_thread_mutex_unlock(&tainted_mutex);
         }
     }
@@ -181,7 +182,7 @@ void ENode::refresh()
 ENode::ENode(int _port):port(_port), stop(false), 
     add_count(0), total_aex_count(0), calib_count(false), calib_ts_ref(false),
     tainted(true), aex_count(0), monitor_aex_count(0), 
-    sock(-1), sleep_time(50), verbosity(0), 
+    sock(-1), sleep_time(500), verbosity(0), 
     monitor_stopped(false), refresh_stopped(false), trigger_stopped(false)
 {
     eprintf("Creating ENode instance...\r\n");
@@ -546,21 +547,7 @@ bool ENode::calibrate()
     eprintf("Calibrating...\r\n");
     if(!calib_count)
     {
-        int NB_RUNS=10;
-        long long int add_count_sum = 0;
-        long long int add_count_mem = add_count_sum;
-        for(int i=1; i<=NB_RUNS; i++)
-        {
-            add_count_mem = add_count_sum;
-            monitor_rdtsc();
-            add_count_sum += add_count;
-            if(add_count_sum < add_count_mem)
-            {
-                eprintf("Overflow detected!\r\n");
-                return false;
-            }
-            add_count_ref = add_count_sum/i;
-        }
+        calibrate_count();
         eprintf("Calibrating drift...\r\n");
         calibrate_drift();
         eprintf("Measured TSC frequency: %f\r\n", tsc_freq);
@@ -580,6 +567,26 @@ bool ENode::calibrate()
     return true;
 }
 
+bool ENode::calibrate_count()
+{
+    int NB_RUNS=10;
+    long long int add_count_sum = 0;
+    long long int add_count_mem = add_count_sum;
+    for(int i=1; i<=NB_RUNS && !should_stop(); i++)
+    {
+        add_count_mem = add_count_sum;
+        monitor_rdtsc();
+        add_count_sum += add_count;
+        if(add_count_sum < add_count_mem)
+        {
+            eprintf("Overflow detected!\r\n");
+            return false;
+        }
+        add_count_ref = add_count_sum/i;
+    }
+    return true;
+}
+
 bool ENode::calibrate_drift()
 {
     long long int mem_total_aex_count;
@@ -588,7 +595,7 @@ bool ENode::calibrate_drift()
     int sleep_time_ms=1000;
     int NB_RUNS=10;
     long long int tsc_tbl[NB_RUNS];
-    for(int i=0; i<NB_RUNS;)
+    for(int i=0; i<NB_RUNS && !should_stop();)
     {
         eprintf("Sending drift slow message %d...\r\n", i+1);
         mem_total_aex_count=total_aex_count;
@@ -600,7 +607,7 @@ bool ENode::calibrate_drift()
         i+=(total_aex_count==mem_total_aex_count)?1:0;
     }
     long double avg_tsc_slow_count=0;
-    for(int i=0; i<NB_RUNS; i++)
+    for(int i=0; i<NB_RUNS && !should_stop(); i++)
     {
         long double mem_avg_tsc_count=avg_tsc_slow_count;
         avg_tsc_slow_count+=(long double)tsc_tbl[i];
@@ -611,7 +618,7 @@ bool ENode::calibrate_drift()
         }
     }
     avg_tsc_slow_count/=NB_RUNS;
-    for(int i=0; i<NB_RUNS;)
+    for(int i=0; i<NB_RUNS && !should_stop();)
     {
         eprintf("Sending drift fast message %d...\r\n", i+1);
         mem_total_aex_count=total_aex_count;
@@ -623,7 +630,7 @@ bool ENode::calibrate_drift()
         i+=(total_aex_count==mem_total_aex_count)?1:0;
     }
     long double avg_tsc_fast_count=0;
-    for(int i=0; i<NB_RUNS; i++)
+    for(int i=0; i<NB_RUNS && !should_stop(); i++)
     {
         long double mem_avg_tsc_count=avg_tsc_fast_count;
         avg_tsc_fast_count+=(long double)tsc_tbl[i];
@@ -638,15 +645,16 @@ bool ENode::calibrate_drift()
     return true;
 }
 
-void ENode::send_recv_drift_message(int sleep_time_ms)
+void ENode::send_recv_drift_message(int sleep_time_ms, int sleep_attack_ms)
 {
-    ocall_usleep(1000*sleep_time_ms);
+    ocall_usleep(1000*(sleep_time_ms+sleep_attack_ms));
 }
 
 bool ENode::monitor_rdtsc()
 {
     long long int start_tsc=rdtscp();
     long long int stop_tsc=3000000*sleep_time+start_tsc;
+    long long int mem_total_aex_count=total_aex_count;
     asm volatile(
         "movq %0, %%r8\n\t"
         "movq %1, %%r9\n\t"
@@ -665,12 +673,13 @@ bool ENode::monitor_rdtsc()
         : "r"(&add_count), "r"(stop_tsc), "r"(&tsc)
         : "rax", "rdx", "r8", "r9"
     );
-    double ACCURACY=0.01;
-    if(!tainted && ((double)add_count>(double)add_count_ref*(1+ACCURACY)
+    double ACCURACY=0.05;
+    if(total_aex_count==mem_total_aex_count && ((double)add_count>(double)add_count_ref*(1+ACCURACY)
     || (double)add_count<(double)add_count_ref*(1-ACCURACY)))
     {
         eprintf("Discalibrated! %f %d %f\r\n",(double)add_count_ref*(1-ACCURACY),add_count,(double)add_count_ref*(1+ACCURACY));
         calib_count = false;
+        calib_ts_ref = false;
     }
     return calib_count;
 }
@@ -757,7 +766,7 @@ int ENode::add_sibling(std::string hostname, uint16_t _port)
 timespec ENode::get_timestamp()
 {
     long long int mem_tsc=tsc;
-    while((mem_tsc==tsc || !calib_count || !calib_ts_ref || tainted) && !should_stop());
+    while((!calib_count || !calib_ts_ref || tainted || mem_tsc==tsc || tsc < tsc_ref) && !should_stop());
     timespec timestamp;
     long long total_nsec = (long long)((double)(tsc-tsc_ref)/tsc_freq);
     timestamp.tv_sec = (total_nsec+ts_ref.tv_nsec)/1000000000;

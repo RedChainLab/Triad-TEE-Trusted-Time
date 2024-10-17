@@ -3,7 +3,7 @@
   <ISVSVN>0</ISVSVN>
   <StackMaxSize>0x40000</StackMaxSize>
   <HeapMaxSize>0x100000</HeapMaxSize>
-  <TCSNum>10</TCSNum>
+  <TCSNum>24</TCSNum>
   <TCSPolicy>1</TCSPolicy>
   <EnableAEXNotify>1</EnableAEXNotify>
   <DisableDebug>0</DisableDebug>

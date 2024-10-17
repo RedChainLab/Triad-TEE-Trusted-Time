@@ -13,7 +13,6 @@ int main(int argc, char* argv[]) {
     Node* node = Node::get_instance(port, core_rdTSC);
     Node* node2 = Node::get_instance(port+1, core_rdTSC+1);
     Node* node3 = Node::get_instance(port+2, core_rdTSC+2);
-    node->get_timestamp();
 
     usleep(10000);
     node->add_sibling("127.0.0.1", port+1);
@@ -24,31 +23,9 @@ int main(int argc, char* argv[]) {
     std::string msg;
     std::cin >> msg;
 
-    do
-    {
-        node->print_timestamp();
-        node2->print_timestamp();
-        node3->print_timestamp();
-
-        std::cout << "<Enter \"OK\" to proceed; anything else to reiterate>"<< std::endl;
-        std::cin >> msg;
-    } while(msg != "OK");
-
-    sleep(60);
-    {
-        node->print_timestamp();
-        node2->print_timestamp();
-        node3->print_timestamp();    
-    }
-
-    std::cout << "<Enter anything to continue>"<< std::endl;
-    std::cin >> msg;
-
-    for (int i = 3; i < argc; i += 2) {
-        node->add_sibling(argv[i], atoi(argv[i+1]));
-        node2->add_sibling(argv[i], atoi(argv[i+1]));
-        node3->add_sibling(argv[i], atoi(argv[i+1]));
-    }
+    node->poll_timestamp(-1);
+    node2->poll_timestamp(-1);
+    node3->poll_timestamp(-1);
 
     std::cout << "<Enter anything to continue>"<< std::endl;
     std::cin >> msg;

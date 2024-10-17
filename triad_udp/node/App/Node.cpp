@@ -222,12 +222,12 @@ static int monitor(int enclave_id, uint16_t port, int core_id)
     return retval;
 }
 
-Node::Node(uint16_t _port, int _core_rdTSC) : port(_port), core_rdTSC(_core_rdTSC), enclave_id(0)
+Node::Node(uint16_t _port, int _core_rdTSC) : stop(false), port(_port), core_rdTSC(_core_rdTSC), enclave_id(0)
 {
     /* Configuration for Switchless SGX */
     sgx_uswitchless_config_t us_config = SGX_USWITCHLESS_CONFIG_INITIALIZER;
-    us_config.num_uworkers = 3;
-    us_config.num_tworkers = 4;
+    us_config.num_uworkers = 12;
+    us_config.num_tworkers = 24;
 
     /* Initialize the enclave */
     if (initialize_enclave(&us_config) < 0) 
@@ -258,6 +258,7 @@ Node::~Node()
     std::cout << getPrefix() << "Destroying node instance..." << std::endl;
     std::cout << getPrefix() << "Signalling to stop..." << std::endl;
     int retvalue = 0;
+    stop = true;
     sgx_status_t ret = ecall_stop(enclave_id, &retvalue, port);
     if (ret != SGX_SUCCESS) 
     {
@@ -370,11 +371,26 @@ void Node::print_timestamp()
     timespec ts_node=this->get_timestamp();
     timespec ts_ref;
     timespec_get(&ts_ref, TIME_UTC);
-    char buff[100];
-    strftime(buff, sizeof buff, "%D %T", gmtime(&(ts_ref.tv_sec)));
-    printf("%s Ref. Time: %s.%09ld UTC\n", getPrefix().c_str(), buff, ts_ref.tv_nsec);
-    strftime(buff, sizeof buff, "%D %T", gmtime(&(ts_node.tv_sec)));
-    printf("%s Node Time: %s.%09ld UTC\n", getPrefix().c_str(), buff, ts_node.tv_nsec);
+    if(!stop)
+    {
+        char buff[100];
+        strftime(buff, sizeof buff, "%D %T", gmtime(&(ts_ref.tv_sec)));
+        printf("%sRef. Time: %s.%09ld UTC\n", getPrefix().c_str(), buff, ts_ref.tv_nsec);
+        strftime(buff, sizeof buff, "%D %T", gmtime(&(ts_node.tv_sec)));
+        printf("%sNode Time: %s.%09ld UTC\n", getPrefix().c_str(), buff, ts_node.tv_nsec);
+    }
+
+}
+
+void Node::poll_timestamp(int count)
+{
+    threads.emplace_back([this, count, stop=std::ref(this->stop)](){
+        for(int i=0; (count<0 || i<count) && !stop; i+=(count>=0)?1:0)
+        {
+            print_timestamp();
+            usleep(1000000);
+        }
+    });
 }
 
 int Node::add_sibling(const std::string& hostname, uint16_t _port)

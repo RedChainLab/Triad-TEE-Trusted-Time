@@ -155,12 +155,13 @@ private:
 
     bool calibrate();
     bool calibrate_drift();
+    bool calibrate_count();
     bool monitor_rdtsc();
 
     int handle_message(const void* buff, size_t buff_len, char* ip, uint16_t port);
     int sendMessage(const void* buff, size_t buff_len, const char* ip, uint16_t port);
 
-    void send_recv_drift_message(int sleep_time_ms);
+    void send_recv_drift_message(int sleep_time_ms, int sleep_attack_ms=0);
 
     void incrementNonce();
     int encrypt(const unsigned char* plaintext, const unsigned long long plen, unsigned char* ciphertext, unsigned long long* clen);
