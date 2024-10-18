@@ -610,7 +610,7 @@ bool ENode::calibrate_drift()
     int NB_RUNS=1;
     long long int tsc_tbl[NB_RUNS];
     int nb_ok_runs=0;
-    while(nb_ok_runs<NB_RUNS)
+    while(nb_ok_runs<NB_RUNS && !should_stop())
     {
         for(int i=0; i<NB_RUNS && !should_stop();i++)
         {
@@ -670,7 +670,7 @@ bool ENode::calibrate_drift()
     }
     avg_tsc_slow_count/=NB_RUNS;
     nb_ok_runs=0;
-    while(nb_ok_runs<NB_RUNS)
+    while(nb_ok_runs<NB_RUNS && !should_stop())
     {
         for(int i=0; i<NB_RUNS && nb_ok_runs<NB_RUNS && !should_stop();i++)
         {
