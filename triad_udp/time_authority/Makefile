@@ -13,7 +13,7 @@ deps:
 	fi
 
 build: deps
-	g++ -o server server.cpp -lsodium
+	g++ -g -Wall -Werror -o server server.cpp -lsodium
 
 clean:
 	rm -f server
