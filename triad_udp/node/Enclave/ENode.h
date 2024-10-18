@@ -82,6 +82,12 @@ typedef struct {
     long long int* monitor_aex;
 }aex_handler_args_t;
 
+typedef struct {
+    long long int msg_id;
+    long long int total_aex_count;
+    long long int tsc;
+}calib_msg_t;
+
 class ENode
 {
 public:
@@ -106,6 +112,7 @@ public:
     sgx_thread_rwlock_t socket_rwlock;
 
     sgx_thread_mutex_t tainted_mutex;
+    sgx_thread_mutex_t calib_mutex;
     sgx_thread_cond_t tainted_cond;
     sgx_thread_cond_t untainted_cond;
 
@@ -127,6 +134,8 @@ public:
 private:
     int sock;
 
+    std::pair<std::string, uint16_t> time_authority;
+
     int sleep_time;
     int verbosity;
 
@@ -136,6 +145,11 @@ private:
     long long tsc_ref;
     timespec ts_ref;
     timespec ts_curr;
+
+    long long int calib_msg_count;
+    static const int NB_CALIB_MSG = 10;
+    calib_msg_t calib_sent[NB_CALIB_MSG];
+    calib_msg_t calib_recvd[NB_CALIB_MSG];
 
     long long add_count_ref;
 

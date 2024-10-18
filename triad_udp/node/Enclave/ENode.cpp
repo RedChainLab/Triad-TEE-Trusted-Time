@@ -68,6 +68,7 @@ typedef enum {
 
 #define TAINTED_STR "Tainted"
 #define UNTAINTING_STR "Untaint"
+#define DRIFT_STR "Drift"
 
 std::map<int /*port*/, ENode*> nodes;
 
@@ -182,7 +183,7 @@ void ENode::refresh()
 ENode::ENode(int _port):port(_port), stop(false), 
     add_count(0), total_aex_count(0), calib_count(false), calib_ts_ref(false),
     tainted(true), aex_count(0), monitor_aex_count(0), 
-    sock(-1), sleep_time(500), verbosity(0), 
+    sock(-1), time_authority(std::make_pair("127.0.0.1",12340)),sleep_time(500), verbosity(0), 
     monitor_stopped(false), refresh_stopped(false), trigger_stopped(false)
 {
     eprintf("Creating ENode instance...\r\n");
@@ -215,6 +216,7 @@ ENode::ENode(int _port):port(_port), stop(false),
     sgx_thread_mutex_init(&tainted_mutex, NULL);
     sgx_thread_rwlock_init(&stop_rwlock, NULL);
     sgx_thread_rwlock_init(&socket_rwlock, NULL);
+    sgx_thread_mutex_init(&calib_mutex, NULL);
     setup_socket();
     test_encdec();
     eprintf("ENode instance created.\r\n");
@@ -251,6 +253,7 @@ ENode::~ENode()
     sgx_thread_cond_destroy(&untainted_cond);
     sgx_thread_rwlock_destroy(&stop_rwlock);
     sgx_thread_rwlock_destroy(&socket_rwlock);
+    sgx_thread_mutex_destroy(&calib_mutex);
 }
 
 void ENode::eprintf(const char *fmt, ...)
@@ -506,6 +509,7 @@ int ENode::handle_message(const void* buff, size_t buff_len, char* ip, uint16_t 
             while((mem_tsc==tsc || !calib_count || !calib_ts_ref) & !should_stop());
             timespec curr_ts;
             long long total_nsec = (long long)((double)(tsc-tsc_ref)/tsc_freq);
+            tsc_ref=tsc;
             curr_ts.tv_sec = (total_nsec+ts_ref.tv_nsec)/1000000000;
             curr_ts.tv_sec += ts_ref.tv_sec;
             curr_ts.tv_nsec = (total_nsec+ts_ref.tv_nsec)%1000000000; 
@@ -517,10 +521,23 @@ int ENode::handle_message(const void* buff, size_t buff_len, char* ip, uint16_t 
             {
                 ts_ref=curr_ts;
             }
-            tsc_ref=mem_tsc;
             tainted = false;
             sgx_thread_cond_signal(&untainted_cond);
             sgx_thread_mutex_unlock(&tainted_mutex);
+            break;
+        }
+        case 'D':
+        {
+            eprintf("Drift message received from %s:%d\r\n", ip, cport);
+            eprintf("Msg of len: %d: %s\r\n", buff_len, buff);
+            long long int mem_tsc=tsc;
+            while(mem_tsc==tsc && !should_stop());
+            const long long int recvd_calib_msg_count = *(const long long int*)((const char*)buff+strlen(DRIFT_STR));
+            const int msg_sleep_time=*(const int*)((const char*)buff+strlen(DRIFT_STR)+sizeof(recvd_calib_msg_count));
+            eprintf("Msg contents: %lld %d\r\n", recvd_calib_msg_count, msg_sleep_time);
+            sgx_thread_mutex_lock(&calib_mutex);
+            calib_recvd[recvd_calib_msg_count%NB_CALIB_MSG]={recvd_calib_msg_count, total_aex_count,tsc};
+            sgx_thread_mutex_unlock(&calib_mutex);
             break;
         }
         default:
@@ -589,28 +606,62 @@ bool ENode::calibrate_count()
 
 bool ENode::calibrate_drift()
 {
-    long long int mem_total_aex_count;
-    long long int mem_tsc;
-    long long int start_tsc;
-    int sleep_time_ms=1000;
-    int NB_RUNS=10;
+    int sleep_time_ms=100;
+    int NB_RUNS=1;
     long long int tsc_tbl[NB_RUNS];
-    for(int i=0; i<NB_RUNS && !should_stop();)
+    int nb_ok_runs=0;
+    while(nb_ok_runs<NB_RUNS)
     {
-        eprintf("Sending drift slow message %d...\r\n", i+1);
-        mem_total_aex_count=total_aex_count;
-        start_tsc=rdtscp();
-        send_recv_drift_message(sleep_time_ms);
-        mem_tsc=rdtscp();
-        tsc_tbl[i]=mem_tsc-start_tsc;
-
-        i+=(total_aex_count==mem_total_aex_count)?1:0;
+        for(int i=0; i<NB_RUNS && !should_stop();i++)
+        {
+            eprintf("Sending slow drift message %d...\r\n", i+1);
+            send_recv_drift_message(sleep_time_ms);
+        }
+        eprintf("Updating tsc for 1s...\r\n");
+        long long int reference_tsc=rdtscp();
+        long long int mem_total_aex_count=total_aex_count;
+        for(;(tsc-reference_tsc<3000000000)&&mem_total_aex_count==total_aex_count&&!should_stop();)
+        {
+            tsc=rdtscp();
+        }
+        //sgx_thread_mutex_lock(&calib_mutex);
+        for (int i=0; i<NB_CALIB_MSG && nb_ok_runs<NB_RUNS && !should_stop(); i++)
+        {
+            eprintf("Checking drift message %d...\r\n", i);
+            if(calib_sent[i].msg_id>0 && calib_recvd[i].msg_id==calib_sent[i].msg_id)
+            {
+                eprintf("Drift message %lld received!\r\n", calib_sent[i].msg_id);
+                long long int diff_total_aex_count=calib_recvd[i].total_aex_count-calib_sent[i].total_aex_count;
+                if(diff_total_aex_count==0)
+                {
+                    long long int diff_tsc=calib_recvd[i].tsc-calib_sent[i].tsc;
+                    tsc_tbl[nb_ok_runs++]=diff_tsc;
+                }
+                else if (diff_total_aex_count<0)
+                {
+                    eprintf("Error: Negative total AEX count difference detected!\r\n");
+                }
+            }
+            else
+            {
+                eprintf("Error: Drift message %lld not received!\r\n", calib_sent[i].msg_id);
+            }
+        }
+        //sgx_thread_mutex_unlock(&calib_mutex);
+        for(int i=0; i<NB_CALIB_MSG;i++)
+        {
+            eprintf("Sent drift message %lld: %lld %lld\r\n", calib_sent[i].msg_id, calib_sent[i].total_aex_count, calib_sent[i].tsc);
+            eprintf("Recvd drift message %lld: %lld %lld\r\n", calib_recvd[i].msg_id, calib_recvd[i].total_aex_count, calib_recvd[i].tsc);
+        }
+        eprintf("OK runs: %d\r\n", nb_ok_runs);
+        memset(calib_sent, 0, sizeof(calib_sent));
+        memset(calib_recvd, 0, sizeof(calib_recvd));
     }
     long double avg_tsc_slow_count=0;
     for(int i=0; i<NB_RUNS && !should_stop(); i++)
     {
         long double mem_avg_tsc_count=avg_tsc_slow_count;
-        avg_tsc_slow_count+=(long double)tsc_tbl[i];
+        avg_tsc_slow_count+=tsc_tbl[i];
         if(avg_tsc_slow_count<mem_avg_tsc_count)
         {
             eprintf("Overflow detected!\r\n");
@@ -618,22 +669,53 @@ bool ENode::calibrate_drift()
         }
     }
     avg_tsc_slow_count/=NB_RUNS;
-    for(int i=0; i<NB_RUNS && !should_stop();)
+    nb_ok_runs=0;
+    while(nb_ok_runs<NB_RUNS)
     {
-        eprintf("Sending drift fast message %d...\r\n", i+1);
-        mem_total_aex_count=total_aex_count;
-        start_tsc=rdtscp();
-        send_recv_drift_message(0);
-        mem_tsc=rdtscp();
-        tsc_tbl[i]=mem_tsc-start_tsc;
-
-        i+=(total_aex_count==mem_total_aex_count)?1:0;
+        for(int i=0; i<NB_RUNS && nb_ok_runs<NB_RUNS && !should_stop();i++)
+        {
+            eprintf("Sending fast drift message %d...\r\n", i+1);
+            send_recv_drift_message(0);
+        }
+        eprintf("Updating tsc for 1s...\r\n");
+        long long int reference_tsc=rdtscp();
+        long long int mem_total_aex_count=total_aex_count;
+        for(;(tsc-reference_tsc<3000000000)&&mem_total_aex_count==total_aex_count&&!should_stop();)
+        {
+            tsc=rdtscp();
+        }
+        //sgx_thread_mutex_lock(&calib_mutex);
+        for (int i=0; i<NB_CALIB_MSG && !should_stop(); i++)
+        {
+            eprintf("Checking drift message %d...\r\n", i);
+            if(calib_sent[i].msg_id>0 && calib_recvd[i].msg_id==calib_sent[i].msg_id)
+            {
+                eprintf("Drift message %lld received!\r\n", calib_sent[i].msg_id);
+                long long int diff_total_aex_count=calib_recvd[i].total_aex_count-calib_sent[i].total_aex_count;
+                if(diff_total_aex_count==0)
+                {
+                    long long int diff_tsc=calib_recvd[i].tsc-calib_sent[i].tsc;
+                    tsc_tbl[nb_ok_runs++]=diff_tsc;
+                }
+                else if (diff_total_aex_count<0)
+                {
+                    eprintf("Error: Negative total AEX count difference detected!\r\n");
+                }
+            }
+            else
+            {
+                eprintf("Error: Drift message %lld not received!\r\n", calib_sent[i].msg_id);
+            }
+        }
+        //sgx_thread_mutex_unlock(&calib_mutex);
+        memset(calib_sent, 0, sizeof(calib_sent));
+        memset(calib_recvd, 0, sizeof(calib_recvd));
     }
     long double avg_tsc_fast_count=0;
     for(int i=0; i<NB_RUNS && !should_stop(); i++)
     {
         long double mem_avg_tsc_count=avg_tsc_fast_count;
-        avg_tsc_fast_count+=(long double)tsc_tbl[i];
+        avg_tsc_fast_count+=tsc_tbl[i];
         if(avg_tsc_fast_count<mem_avg_tsc_count)
         {
             eprintf("Overflow detected!\r\n");
@@ -647,7 +729,15 @@ bool ENode::calibrate_drift()
 
 void ENode::send_recv_drift_message(int sleep_time_ms, int sleep_attack_ms)
 {
-    ocall_usleep(1000*(sleep_time_ms+sleep_attack_ms));
+    int total_sleep_time_ms=sleep_time_ms+sleep_attack_ms;
+    char send_buff[1024] = {0};
+    memcpy(send_buff, DRIFT_STR, strlen(DRIFT_STR));
+    memcpy(send_buff+strlen(DRIFT_STR), &calib_msg_count, sizeof(calib_msg_count));
+    memcpy(send_buff+strlen(DRIFT_STR)+sizeof(calib_msg_count), &total_sleep_time_ms, sizeof(total_sleep_time_ms));
+
+    calib_sent[calib_msg_count%NB_CALIB_MSG]={calib_msg_count, total_aex_count, tsc};
+    sendMessage(send_buff, strlen(DRIFT_STR)+sizeof(calib_msg_count)+sizeof(total_sleep_time_ms), time_authority.first.c_str(), time_authority.second);
+    calib_msg_count++;
 }
 
 bool ENode::monitor_rdtsc()

@@ -20,3 +20,6 @@ triad
 **.pem
 .vscode/settings.json
 **.log
+**/server
+**.tar.gz
+libsodium-*
