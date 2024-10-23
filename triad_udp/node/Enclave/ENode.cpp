@@ -530,8 +530,8 @@ int ENode::handle_message(const void* buff, size_t buff_len, char* ip, uint16_t 
         {
             eprintf("Drift message received from %s:%d\r\n", ip, cport);
             eprintf("Msg of len: %d: %s\r\n", buff_len, buff);
-            long long int mem_tsc=tsc;
-            while(mem_tsc==tsc && !should_stop());
+            //long long int mem_tsc=tsc;
+            //while(mem_tsc==tsc && !should_stop());
             const long long int recvd_calib_msg_count = *(const long long int*)((const char*)buff+strlen(DRIFT_STR));
             const int msg_sleep_time=*(const int*)((const char*)buff+strlen(DRIFT_STR)+sizeof(recvd_calib_msg_count));
             eprintf("Msg contents: %lld %d\r\n", recvd_calib_msg_count, msg_sleep_time);
@@ -606,8 +606,8 @@ bool ENode::calibrate_count()
 
 bool ENode::calibrate_drift()
 {
-    int sleep_time_ms=100;
-    int NB_RUNS=1;
+    int sleep_time_ms=1000;
+    int NB_RUNS=10;
     long long int tsc_tbl[NB_RUNS];
     int nb_ok_runs=0;
     while(nb_ok_runs<NB_RUNS && !should_stop())
@@ -616,6 +616,7 @@ bool ENode::calibrate_drift()
         {
             eprintf("Sending slow drift message %d...\r\n", i+1);
             send_recv_drift_message(sleep_time_ms);
+            ocall_usleep(10000);
         }
         eprintf("Updating tsc for 1s...\r\n");
         long long int reference_tsc=rdtscp();
@@ -676,6 +677,7 @@ bool ENode::calibrate_drift()
         {
             eprintf("Sending fast drift message %d...\r\n", i+1);
             send_recv_drift_message(0);
+            ocall_usleep(10000);
         }
         eprintf("Updating tsc for 1s...\r\n");
         long long int reference_tsc=rdtscp();

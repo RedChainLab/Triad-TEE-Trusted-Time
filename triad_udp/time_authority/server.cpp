@@ -17,8 +17,6 @@ std::mutex sendMutex;
 
 void handleMsg(int serSockDes, struct sockaddr_in cliAddr, socklen_t cliAddrLen, const char* buff, ssize_t readStatus, const unsigned char* nonce, const unsigned char* key) 
 {
-    printf("Handling message from %d\r\n", ntohs(cliAddr.sin_port));
-    
     // Dynamic allocation for decrypted buffer
     unsigned char buff_dec[1024]; // Ensure this is large enough for your data
     unsigned long long buff_len_dec;
@@ -33,8 +31,6 @@ void handleMsg(int serSockDes, struct sockaddr_in cliAddr, socklen_t cliAddrLen,
     const long long int recvd_calib_msg_count = *(const long long int*)((const char*)buff_dec + strlen(DRIFT_STR));
     const int sleep_time = *(const int*)((const char*)buff_dec + strlen(DRIFT_STR) + sizeof(recvd_calib_msg_count));
 
-    cout.write((const char*)buff_dec, buff_len_dec);
-    cout << endl;
     cout << "Received from " << ntohs(cliAddr.sin_port) << " calib_msg: " << recvd_calib_msg_count << " and will sleep for " << sleep_time << "ms" << endl;
 
     usleep(sleep_time * 1000);
@@ -55,8 +51,6 @@ void handleMsg(int serSockDes, struct sockaddr_in cliAddr, socklen_t cliAddrLen,
     
     if (sendto(serSockDes, buff_enc, buff_len_enc, 0, (struct sockaddr*)&cliAddr, cliAddrLen) < 0) { 
         perror("sending error...\n");
-    } else {
-        cout << "Sent back to " << ntohs(cliAddr.sin_port) << endl;
     }
     sendMutex.unlock(); // Unlock the mutex after sending
 }
