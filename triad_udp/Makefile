@@ -1,5 +1,5 @@
 APP_NAME=triad
-SO_PATH=node/libtriad.so node/enclave.signed.so node/enclave.so
+SO_PATH=node/libtriad.so
 TIME_AUTH_DIR=time_authority
 TIME_AUTH_PATH=$(TIME_AUTH_DIR)/server
 
