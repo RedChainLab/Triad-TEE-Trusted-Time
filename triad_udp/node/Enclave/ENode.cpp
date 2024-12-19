@@ -55,17 +55,6 @@ int printf(const char *fmt, ...)
 }
 #endif
 
-typedef enum {
-    SYSCALL_SLEEP = 0,
-    O_READTSC_SLEEP = 1,
-    E_READTSC_SLEEP = 2,
-    C_ADDER_SLEEP = 3,
-    ASM_ADDER_SLEEP = 4,
-    SELF_MONITOR = 5,
-    AEX_SELF_MONITOR = 6,
-    AEX_ASM_SELF_MONITOR = 7
-}sleep_type_t;
-
 #define TAINTED_STR "Tainted"
 #define UNTAINTING_STR "Untaint"
 #define DRIFT_STR "Drift"
