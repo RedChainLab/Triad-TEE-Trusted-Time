@@ -1,7 +1,7 @@
 all: build
 
 deps:
-	if ! ldconfig -p | grep -q libsodium; then \
+	if ! ldconfig -p | grep libsodium; then \
 		if ! test -d libsodium-1.0.18; then \
 			if ! test -f libsodium-1.0.18.tar.gz; then \
 				wget https://github.com/jedisct1/libsodium/releases/download/1.0.18-RELEASE/libsodium-1.0.18.tar.gz; \

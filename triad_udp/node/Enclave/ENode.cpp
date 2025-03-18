@@ -601,9 +601,8 @@ bool ENode::calibrate_drift()
     int nb_ok_runs=0;
     while(nb_ok_runs<NB_RUNS && !should_stop())
     {
-        for(int i=0; i<NB_RUNS && !should_stop();i++)
         {
-            eprintf("Sending slow drift message %d...\r\n", i+1);
+            eprintf("Sending slow drift message %d...\r\n", nb_ok_runs+1);
             send_recv_drift_message(sleep_time_ms);
             ocall_usleep(10000);
         }
@@ -662,9 +661,8 @@ bool ENode::calibrate_drift()
     nb_ok_runs=0;
     while(nb_ok_runs<NB_RUNS && !should_stop())
     {
-        for(int i=0; i<NB_RUNS && nb_ok_runs<NB_RUNS && !should_stop();i++)
         {
-            eprintf("Sending fast drift message %d...\r\n", i+1);
+            eprintf("Sending fast drift message %d...\r\n", nb_ok_runs+1);
             send_recv_drift_message(0);
             ocall_usleep(10000);
         }

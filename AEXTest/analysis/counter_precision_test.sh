@@ -1,6 +1,6 @@
 #/bin/sh
-CORE_COUNTER=2
-CORE_MONITOR=3
+CORE_COUNTER=5
+CORE_MONITOR=2
 
 VERBOSITY=$1 # Required value for subsequent scripts
 

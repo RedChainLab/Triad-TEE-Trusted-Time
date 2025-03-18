@@ -77,7 +77,7 @@ Available Python scripts do the following:
 To test the precision of the counter thread (whether there is low/high spread in the number of increments in a given timeframe), `counter_precision_test.sh` is available.
 The command line template is:
 ``` sh
-    analysis/counter_precision_test.sh <verbosity> <sgx_type>*<sleep_type>*<sleep_time_secs>*<n_repeats>]...
+    analysis/counter_precision_test.sh <verbosity> [<sgx_type>*<sleep_type>*<sleep_time_secs>*<n_repeats>]...
 ```
 The first argument, between 0 and 2, runs AEXTest either with the sleep out-/inside the enclave (as before with other scripts.) The following arguments tell how long to sleep each run, and how many run with that sleep time will be executed.
 The .csv logs are written in `out/count<verbosity>/count-<timestamp>-<sgx_type>-<sleep_type>-<sleep_time_secs>-<repeat_id>.csv` files.
@@ -112,7 +112,7 @@ cpupower -c <core-list> frequency-set <MHz-frequency>
 ```
 e.g.:
 ``` sh
-cpupower -c 2-3 frequency-set 3500
+cpupower -c 2-3 frequency-set --min 3500 --max 3500
 ```
 To see the current frequency with the `cpupower`:
 ``` sh
@@ -123,7 +123,7 @@ The previous approach does not always seem to take effect (seems to either put t
 
 Alternatively, use `wrmsr` on MSR `MSR_IA32_PERF_CTL` (`0x199`):
 ``` sh
-modprobe msr
+sudo modprobe msr
 sudo wrmsr [-p <core-number>] 0x199 0x<MHz-frequency>
 ```
 You can read the current core frequency with `MSR_IA32_PERF_STATUS` (`0x198`)
