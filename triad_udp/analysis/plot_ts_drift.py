@@ -47,26 +47,26 @@ try:
     states_df = pd.read_csv(f, header=None, sep=' ')
 except Exception as e:
   print(f'Error reading {file}-states.log: {e}\n')
-print(df)
-print(aex_df)
-print(ut_node_df)
-print(ut_ta_df)
-print(states_df)
+# print(df)
+# print(aex_df)
+# print(ut_node_df)
+# print(ut_ta_df)
+# print(states_df)
 
 aex_df.drop(columns=[0,3], inplace=True)
 aex_df.columns = ['ID','type', 'date', "time","TZ"]
 aex_df["datetime"]=pd.to_datetime(aex_df["date"]+" "+aex_df["time"])
-print(aex_df)
+# print(aex_df)
 
 ut_ta_df.drop(columns=[0,3], inplace=True)
 ut_ta_df.columns = ['ID','type', 'date', "time","TZ"]
 ut_ta_df["datetime"]=pd.to_datetime(ut_ta_df["date"]+" "+ut_ta_df["time"])
-print(ut_ta_df)
+# print(ut_ta_df)
 
 ut_node_df.drop(columns=[0,3], inplace=True)
 ut_node_df.columns = ['ID','type', 'date', "time","TZ"]
 ut_node_df["datetime"]=pd.to_datetime(ut_node_df["date"]+" "+ut_node_df["time"])
-print(ut_node_df)
+# print(ut_node_df)
 
 states_df.drop(columns=[0,3], inplace=True)
 states_df.columns = ['ID','type', 'date', "time","TZ"]
@@ -94,7 +94,7 @@ ut_ta_df["datetime"]=(ut_ta_df["datetime"]-ref_datetime)/pd.Timedelta('1s')
 ut_node_df["datetime"]=(ut_node_df["datetime"]-ref_datetime)/pd.Timedelta('1s')
 states_df["datetime"]=(states_df["datetime"]-ref_datetime)/pd.Timedelta('1s')
 
-print(node_ts, ref_ts, merged)
+# print(node_ts, ref_ts, merged)
 fig, ax = plt.subplots(nrows=5, sharex=True)
 colors=["tab:blue","tab:orange","tab:green"]
 for group, color in zip(merged.groupby("ID_node"), colors):
@@ -148,3 +148,40 @@ ax[0].legend()
 if log:
   ax[0].set_yscale('log')
 fig.savefig(f'fig/{file}{"-log" if log else ""}.png', bbox_inches='tight', dpi=1200)
+
+def compute_state_durations(states_df, state_value):
+  state_df = states_df.copy()
+  state_df["type"] = states_df["type"].replace({0: 0, 1: 0, 2: 0, state_value: 1})
+  state_df["duration"] = state_df.groupby("ID")["datetime"].diff().fillna(0)
+  state_df["duration"] = state_df.groupby("ID")["duration"].shift(-1).fillna(0)
+  state_df = state_df[state_df["type"] == 1]
+  state_durations = state_df.groupby("ID")["duration"].sum()
+  return state_durations
+
+ok_durations = compute_state_durations(states_df, 0)
+tainted_durations = compute_state_durations(states_df, 1)
+calib_durations = compute_state_durations(states_df, 2)
+
+# Merge the three state durations into a single DataFrame
+state_durations_df = pd.DataFrame({
+  'OK': ok_durations,
+  'Tainted': tainted_durations,
+  'Calib': calib_durations
+}).fillna(0)
+state_durations_df["ID"]=state_durations_df.index.str[:-2]
+state_durations_df.set_index("ID", inplace=True)
+
+# Plot the state durations
+fig2, ax2 = plt.subplots()
+state_durations_df_normalized = state_durations_df.div(state_durations_df.sum(axis=1), axis=0) * 100
+
+ax2.bar(state_durations_df_normalized.index, state_durations_df_normalized['OK'], color='tab:blue', label='OK', edgecolor='black')
+ax2.bar(state_durations_df_normalized.index, state_durations_df_normalized['Tainted'], bottom=state_durations_df_normalized['OK'], color='tab:orange', label='Tainted', edgecolor='black')
+ax2.bar(state_durations_df_normalized.index, state_durations_df_normalized['Calib'], bottom=state_durations_df_normalized['OK']+state_durations_df_normalized['Tainted'], color='tab:green', label='Calib', edgecolor='black')
+ax2.set_xlabel('Node ID')
+ax2.set_ylabel('Duration (\%)')
+ax2.grid(axis='y', linestyle='-', linewidth='0.5')
+ax2.grid(axis='y', which='minor', linestyle=':', linewidth='0.5')
+ax2.minorticks_on()
+ax2.legend(title='State', loc='lower center')
+fig2.savefig(f'fig/{file}-state-durations.png', bbox_inches='tight', dpi=1200)
