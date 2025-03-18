@@ -35,12 +35,29 @@ void handleMsg(int serSockDes, struct sockaddr_in cliAddr, socklen_t cliAddrLen,
 
     usleep(sleep_time * 1000);
 
-    unsigned char buff_enc[buff_len_dec + crypto_aead_aes256gcm_ABYTES];
+    timespec ts;
+    timespec_get(&ts, TIME_UTC);
+    char ts_buff[100];
+    strftime(ts_buff, sizeof ts_buff, "%D %T", gmtime(&(ts.tv_sec)));
+    printf("TA Time: %s.%09ld UTC\n", ts_buff, ts.tv_nsec);
+
+    char send_buff[1024] = {0};
+    int msg_cursor=0;
+    memcpy(send_buff+msg_cursor, DRIFT_STR, strlen(DRIFT_STR));
+    msg_cursor+=strlen(DRIFT_STR);
+    memcpy(send_buff+msg_cursor, &recvd_calib_msg_count, sizeof(recvd_calib_msg_count));
+    msg_cursor+=sizeof(recvd_calib_msg_count);
+    memcpy(send_buff+msg_cursor, &sleep_time, sizeof(sleep_time));
+    msg_cursor+=sizeof(sleep_time);
+    memcpy(send_buff+msg_cursor, &ts, sizeof(ts));
+    msg_cursor+=sizeof(ts);
+
+    unsigned char buff_enc[msg_cursor + crypto_aead_aes256gcm_ABYTES];
     unsigned long long buff_len_enc;
 
     if (crypto_aead_aes256gcm_encrypt(buff_enc, &buff_len_enc,
-                                       buff_dec, buff_len_dec,
-                                       NULL, 0, NULL, nonce, key) != 0) {
+                                        (unsigned char*)send_buff, msg_cursor,
+                                        NULL, 0, NULL, nonce, key) != 0) {
         perror("Encryption failed\r\n");
         return;
     }

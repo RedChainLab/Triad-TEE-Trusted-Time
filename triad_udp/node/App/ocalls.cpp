@@ -47,18 +47,18 @@ void ocall_timespec_get(struct timespec* ts) {
     Get the current time
     */
     timespec_get(ts, TIME_UTC);
-    char buff[100];
-    strftime(buff, sizeof buff, "%D %T", gmtime(&(ts->tv_sec)));
-    printf("[utrst]> Current time: %s.%09ld UTC\n", buff, ts->tv_nsec);
+    // char buff[100];
+    // strftime(buff, sizeof buff, "%D %T", gmtime(&(ts->tv_sec)));
+    // printf("[utrst]> Current time: %s.%09ld UTC\n", buff, ts->tv_nsec);
 }
 
-void ocall_timespec_print(struct timespec* ts) {
+void ocall_timespec_print(struct timespec* ts, int id, int caller) {
     /*
     Print the time
     */
     char buff[100];
     strftime(buff, sizeof buff, "%D %T", gmtime(&(ts->tv_sec)));
-    printf("[utrst]> Time: %s.%09ld UTC\n", buff, ts->tv_nsec);
+    printf("[utrst-%s %d]> TS Time: %s.%09ld UTC\n", caller==0?"Handler":caller==1?"ENode":"TA", id, buff, ts->tv_nsec);
 }
 
 #ifdef __cplusplus

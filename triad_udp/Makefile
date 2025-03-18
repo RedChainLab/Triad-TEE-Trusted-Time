@@ -3,12 +3,19 @@ SO_PATH=node/libtriad.so
 TIME_AUTH_DIR=time_authority
 TIME_AUTH_PATH=$(TIME_AUTH_DIR)/server
 
+LOG_PATH=out/log
+OUT_PATH=out/ts
+
 all: build
 
 build: $(SO_PATH) $(APP_NAME) $(TIME_AUTH_PATH)
 
 run: build
-	./$(APP_NAME)
+	./$(APP_NAME) 12345 2
+
+exp: build
+	mkdir -p ${LOG_PATH}
+	./$(APP_NAME) 12345 2 > "${LOG_PATH}/triad-`date +%Y-%m-%d-%H-%M-%S`.log"
 
 $(SO_PATH):
 	cd node && make

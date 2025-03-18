@@ -59,6 +59,12 @@ int printf(const char *fmt, ...)
 #define UNTAINTING_STR "Untaint"
 #define DRIFT_STR "Drift"
 
+typedef enum callers{
+    HANDLER=0,
+    ENODE=1,
+    TA=2
+} callers_t;
+
 std::map<int /*port*/, ENode*> nodes;
 
 static void printArray(long long int *arr, long long int size, long long int reference){
@@ -94,6 +100,10 @@ static void aex_handler(const sgx_exception_info_t *info, const void * args)
     *aex_args->total_aex_count += 1;
     sgx_thread_mutex_lock(aex_args->tainted_mutex);
     printf("[Handler %d]> AEX %lld\r\n", aex_args->port, *aex_args->total_aex_count);
+    timespec ts_ref;
+    ocall_timespec_get(&ts_ref);
+    ocall_timespec_print(&ts_ref, aex_args->port, HANDLER);
+    // printf("[Handler %d]> Reference time: %ld.%09ld UTC\n", aex_args->port, ts_ref.tv_sec, ts_ref.tv_nsec);
     sgx_thread_cond_signal(aex_args->tainted_cond);
     sgx_thread_mutex_unlock(aex_args->tainted_mutex);
 
@@ -478,7 +488,9 @@ int ENode::handle_message(const void* buff, size_t buff_len, char* ip, uint16_t 
                 timestamp.tv_sec += ts_ref.tv_sec;
                 timestamp.tv_nsec = (total_nsec+ts_ref.tv_nsec)%1000000000; 
                 eprintf("Sending untainting ts: %ld.%ld\r\n", timestamp.tv_sec, timestamp.tv_nsec);
-                ocall_timespec_print(&timestamp);
+                timespec mon_ts;
+                ocall_timespec_get(&mon_ts);
+                ocall_timespec_print(&mon_ts, this->port, ENODE);
                 char send_buff[1024] = {0};
                 memcpy(send_buff, UNTAINTING_STR, strlen(UNTAINTING_STR));
                 memcpy(send_buff+strlen(UNTAINTING_STR), &timestamp, sizeof(timespec));
@@ -493,7 +505,9 @@ int ENode::handle_message(const void* buff, size_t buff_len, char* ip, uint16_t 
             timespec timestamp;
             timestamp = *(const timespec*)((const char*)buff+strlen(UNTAINTING_STR));
             eprintf("Untainting with ts: %ld.%ld\r\n", timestamp.tv_sec, timestamp.tv_nsec);
-            ocall_timespec_print(&timestamp);
+            timespec mon_ts;
+            ocall_timespec_get(&mon_ts);
+            ocall_timespec_print(&mon_ts, this->port, ENODE);
             long long int mem_tsc=tsc;
             while((mem_tsc==tsc || !calib_count || !calib_ts_ref) & !should_stop());
             timespec curr_ts;
@@ -521,9 +535,15 @@ int ENode::handle_message(const void* buff, size_t buff_len, char* ip, uint16_t 
             eprintf("Msg of len: %d: %s\r\n", buff_len, buff);
             //long long int mem_tsc=tsc;
             //while(mem_tsc==tsc && !should_stop());
-            const long long int recvd_calib_msg_count = *(const long long int*)((const char*)buff+strlen(DRIFT_STR));
-            const int msg_sleep_time=*(const int*)((const char*)buff+strlen(DRIFT_STR)+sizeof(recvd_calib_msg_count));
-            eprintf("Msg contents: %lld %d\r\n", recvd_calib_msg_count, msg_sleep_time);
+            int msg_cursor=strlen(DRIFT_STR);
+            const long long int recvd_calib_msg_count = *(const long long int*)((const char*)buff+msg_cursor);
+            msg_cursor+=sizeof(recvd_calib_msg_count);
+            const int msg_sleep_time=*(const int*)((const char*)buff+msg_cursor);
+            msg_cursor+=sizeof(msg_sleep_time);
+            timespec ta_ts;
+            ta_ts=*(timespec*)((const char*)buff+msg_cursor);
+            msg_cursor+=sizeof(ta_ts);
+            eprintf("Msg contents: %lld %d %ld.%09ld UTC%\r\n", recvd_calib_msg_count, msg_sleep_time, ta_ts.tv_sec, ta_ts.tv_nsec);
             sgx_thread_mutex_lock(&calib_mutex);
             calib_recvd[recvd_calib_msg_count%NB_CALIB_MSG]={recvd_calib_msg_count, total_aex_count,tsc};
             sgx_thread_mutex_unlock(&calib_mutex);
@@ -562,10 +582,10 @@ bool ENode::calibrate()
     if(!calib_ts_ref)
     {
         ocall_timespec_get(&ts_ref);
-        eprintf("Reference time: %ld.%09ld\r\n", ts_ref.tv_sec, ts_ref.tv_nsec);
+        ocall_timespec_print(&ts_ref, this->port, TA);
         ts_curr = ts_ref;
         tsc_ref = rdtscp();
-        eprintf("Reference TSC: %lld\r\n", tsc_ref);
+        eprintf("Ref. TSC: %lld\r\n", tsc_ref);
         calib_ts_ref=true;
     }
     eprintf("Calibration done.\r\n");
