@@ -71,7 +71,7 @@ ut_node_df["datetime"]=pd.to_datetime(ut_node_df["date"]+" "+ut_node_df["time"])
 states_df.drop(columns=[0,3], inplace=True)
 states_df.columns = ['ID','type', 'date', "time","TZ"]
 states_df["datetime"]=pd.to_datetime(states_df["date"]+" "+states_df["time"])
-states_df["type"].replace({"OK": 0, "Tainted": 1, "Calib":2}, inplace=True)
+states_df["type"].replace({"OK": 0, "Tainted": 1, "RefCalib":2, "FullCalib":3}, inplace=True)
 print(states_df)
 
 df.drop(columns=[0,3], inplace=True)
@@ -131,8 +131,8 @@ ax[3].set_ylim(0)
 
 ax[4].grid(True)
 ax[4].grid(which='major', linestyle='-', linewidth='0.5')
-ax[4].set_yticks([0,1,2])
-ax[4].set_yticklabels(["OK","Tainted","Calib"])
+ax[4].set_yticks([0,1,2,3])
+ax[4].set_yticklabels(["OK","Tainted","RefCalib","FullCalib"])
 
 ax[3].set_xlabel('reference time (s)')
 ax[0].set_ylabel('drift (ms)')
@@ -151,7 +151,7 @@ fig.savefig(f'fig/{file}{"-log" if log else ""}.png', bbox_inches='tight', dpi=1
 
 def compute_state_durations(states_df, state_value):
   state_df = states_df.copy()
-  state_df["type"] = states_df["type"].replace({0: 0, 1: 0, 2: 0, state_value: 1})
+  state_df["type"] = states_df["type"].replace({0: 0, 1: 0, 2: 0, 3: 0, state_value: 1})
   state_df["duration"] = state_df.groupby("ID")["datetime"].diff().fillna(0)
   state_df["duration"] = state_df.groupby("ID")["duration"].shift(-1).fillna(0)
   state_df = state_df[state_df["type"] == 1]
@@ -160,13 +160,15 @@ def compute_state_durations(states_df, state_value):
 
 ok_durations = compute_state_durations(states_df, 0)
 tainted_durations = compute_state_durations(states_df, 1)
-calib_durations = compute_state_durations(states_df, 2)
+refcalib_durations = compute_state_durations(states_df, 2)
+fullcalib_durations = compute_state_durations(states_df, 3)
 
 # Merge the three state durations into a single DataFrame
 state_durations_df = pd.DataFrame({
   'OK': ok_durations,
   'Tainted': tainted_durations,
-  'Calib': calib_durations
+  'RefCalib': refcalib_durations,
+  'FullCalib': fullcalib_durations
 }).fillna(0)
 state_durations_df["ID"]=state_durations_df.index.str[:-2]
 state_durations_df.set_index("ID", inplace=True)
@@ -177,7 +179,8 @@ state_durations_df_normalized = state_durations_df.div(state_durations_df.sum(ax
 
 ax2.bar(state_durations_df_normalized.index, state_durations_df_normalized['OK'], color='tab:blue', label='OK', edgecolor='black')
 ax2.bar(state_durations_df_normalized.index, state_durations_df_normalized['Tainted'], bottom=state_durations_df_normalized['OK'], color='tab:orange', label='Tainted', edgecolor='black')
-ax2.bar(state_durations_df_normalized.index, state_durations_df_normalized['Calib'], bottom=state_durations_df_normalized['OK']+state_durations_df_normalized['Tainted'], color='tab:green', label='Calibrating', edgecolor='black')
+ax2.bar(state_durations_df_normalized.index, state_durations_df_normalized['RefCalib'], bottom=state_durations_df_normalized['OK'] + state_durations_df_normalized['Tainted'], color='tab:green', label='GET TA Time', edgecolor='black')
+ax2.bar(state_durations_df_normalized.index, state_durations_df_normalized['FullCalib'], bottom=state_durations_df_normalized['OK'] + state_durations_df_normalized['Tainted'] + state_durations_df_normalized['RefCalib'], color='tab:red', label='GET TA Clock Speed', edgecolor='black')
 ax2.set_xlabel('Node ID')
 ax2.set_ylabel('Duration (\%)')
 ax2.grid(axis='y', linestyle='-', linewidth='0.5')

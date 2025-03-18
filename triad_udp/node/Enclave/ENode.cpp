@@ -65,7 +65,8 @@ typedef enum callers{
     TA=2,
     OK=3,
     TAINTED=4,
-    CALIB=5
+    REF_CALIB=5,
+    FULL_CALIB=6
 } callers_t;
 
 std::map<int /*port*/, ENode*> nodes;
@@ -168,8 +169,11 @@ void ENode::refresh()
                     eprintf("Sending untaint to %s:%d\r\n", siblings[i].first.c_str(), siblings[i].second);
                     sendMessage(TAINTED_STR, strlen(TAINTED_STR), siblings[i].first.c_str(), siblings[i].second);
                 }
-                ocall_usleep(100000);
-            } while (mem_total_aex_count!=total_aex_count);
+                eprintf("Updating tsc for 10ms...\r\n");
+                long long int reference_tsc=tsc;
+                const int wait_time=10; //[ms]
+                while(tainted && (tsc-reference_tsc<3000000*wait_time) && !should_stop());
+            } while (mem_total_aex_count!=total_aex_count && !should_stop());
             if(tainted)
             {
                 eprintf("Peer untainting failed.\r\n");
@@ -177,7 +181,7 @@ void ENode::refresh()
                 {
                     timespec mon_ts;
                     ocall_timespec_get(&mon_ts);
-                    ocall_timespec_print(&mon_ts, this->port, CALIB);
+                    ocall_timespec_print(&mon_ts, this->port, REF_CALIB);
                 }
             }
         }
@@ -641,6 +645,7 @@ bool ENode::calibrate_count()
 bool ENode::calibrate_drift()
 {
     int sleep_time_ms=1000;
+    int max_roundtrip_ms=100;
     int NB_RUNS=10;
     long long int tsc_tbl[NB_RUNS];
     int nb_ok_runs=0;
@@ -649,15 +654,21 @@ bool ENode::calibrate_drift()
         {
             eprintf("Sending slow drift message %d...\r\n", nb_ok_runs+1);
             send_recv_drift_message(sleep_time_ms);
-            ocall_usleep(10000);
         }
         eprintf("Updating tsc for 1s...\r\n");
-        long long int reference_tsc=rdtscp();
+        long long int reference_tsc=tsc=rdtscp();
         long long int mem_total_aex_count=total_aex_count;
-        for(;(tsc-reference_tsc<3000000000)&&mem_total_aex_count==total_aex_count&&!should_stop();)
+        const int N_ROUNDS=4;
+        long long int threshold=3000000*((sleep_time_ms+max_roundtrip_ms)/N_ROUNDS);
+        for(int i=0; i<N_ROUNDS && calib_recvd[0].msg_id!=calib_sent[0].msg_id && mem_total_aex_count==total_aex_count && !should_stop(); i++)
         {
-            tsc=rdtscp();
+            for(;calib_recvd[0].msg_id!=calib_sent[0].msg_id&&(tsc-reference_tsc<threshold)&&mem_total_aex_count==total_aex_count&&!should_stop();)
+            {
+                tsc=rdtscp();
+            }
+            reference_tsc=tsc=rdtscp();
         }
+
         //sgx_thread_mutex_lock(&calib_mutex);
         for (int i=0; i<NB_CALIB_MSG && nb_ok_runs<NB_RUNS && !should_stop(); i++)
         {
@@ -709,15 +720,17 @@ bool ENode::calibrate_drift()
         {
             eprintf("Sending fast drift message %d...\r\n", nb_ok_runs+1);
             send_recv_drift_message(0);
-            ocall_usleep(10000);
         }
         eprintf("Updating tsc for 1s...\r\n");
-        long long int reference_tsc=rdtscp();
+        long long int reference_tsc=tsc=rdtscp();
         long long int mem_total_aex_count=total_aex_count;
-        for(;(tsc-reference_tsc<3000000000)&&mem_total_aex_count==total_aex_count&&!should_stop();)
+        long long int threshold=3000000*(max_roundtrip_ms);
+
+        for(;calib_recvd[0].msg_id!=calib_sent[0].msg_id&&(tsc-reference_tsc<threshold)&&mem_total_aex_count==total_aex_count&&!should_stop();)
         {
             tsc=rdtscp();
         }
+
         //sgx_thread_mutex_lock(&calib_mutex);
         for (int i=0; i<NB_CALIB_MSG && !should_stop(); i++)
         {
@@ -807,7 +820,7 @@ bool ENode::monitor_rdtsc()
         {
             timespec mon_ts;
             ocall_timespec_get(&mon_ts);
-            ocall_timespec_print(&mon_ts, this->port, CALIB);
+            ocall_timespec_print(&mon_ts, this->port, FULL_CALIB);
         }
     }
     return calib_count;
@@ -820,6 +833,13 @@ void ENode::monitor(){
     sgx_aex_mitigation_node_t node;
 
     sgx_register_aex_handler(&node, aex_handler, (const void*)&aex_args);
+
+    {
+        timespec mon_ts;
+        ocall_timespec_get(&mon_ts);
+        ocall_timespec_print(&mon_ts, this->port, FULL_CALIB);
+    }
+
     long long int reference = 0;
     while (!should_stop())
     {    

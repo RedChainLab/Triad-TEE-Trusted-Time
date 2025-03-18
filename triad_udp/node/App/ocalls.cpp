@@ -76,7 +76,10 @@ void ocall_timespec_print(struct timespec* ts, int id, int caller) {
             printf("[utrst-StateSwitch %d]> %s Time: %s.%09ld UTC\n", id, "Tainted", buff, ts->tv_nsec);
             break;
         case 5:
-            printf("[utrst-StateSwitch %d]> %s Time: %s.%09ld UTC\n", id, "Calib", buff, ts->tv_nsec);
+            printf("[utrst-StateSwitch %d]> %s Time: %s.%09ld UTC\n", id, "RefCalib", buff, ts->tv_nsec);
+            break;
+        case 6:
+            printf("[utrst-StateSwitch %d]> %s Time: %s.%09ld UTC\n", id, "FullCalib", buff, ts->tv_nsec);
             break;
         default:
             printf("[utrst-%s %d]> TS Time: %s.%09ld UTC\n", "Unknown", id, buff, ts->tv_nsec);

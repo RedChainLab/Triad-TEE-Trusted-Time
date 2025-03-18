@@ -150,7 +150,7 @@ private:
     timespec ts_curr;
 
     long long int calib_msg_count;
-    static const int NB_CALIB_MSG = 10;
+    static const int NB_CALIB_MSG = 1;
     calib_msg_t calib_sent[NB_CALIB_MSG];
     calib_msg_t calib_recvd[NB_CALIB_MSG];
 
