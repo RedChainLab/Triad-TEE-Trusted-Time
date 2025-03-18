@@ -62,7 +62,10 @@ int printf(const char *fmt, ...)
 typedef enum callers{
     HANDLER=0,
     ENODE=1,
-    TA=2
+    TA=2,
+    OK=3,
+    TAINTED=4,
+    CALIB=5
 } callers_t;
 
 std::map<int /*port*/, ENode*> nodes;
@@ -103,6 +106,10 @@ static void aex_handler(const sgx_exception_info_t *info, const void * args)
     timespec ts_ref;
     ocall_timespec_get(&ts_ref);
     ocall_timespec_print(&ts_ref, aex_args->port, HANDLER);
+    if(*aex_args->calib_ts_ref && *aex_args->calib_count)
+    {
+        ocall_timespec_print(&ts_ref, aex_args->port, TAINTED);
+    }
     // printf("[Handler %d]> Reference time: %ld.%09ld UTC\n", aex_args->port, ts_ref.tv_sec, ts_ref.tv_nsec);
     sgx_thread_cond_signal(aex_args->tainted_cond);
     sgx_thread_mutex_unlock(aex_args->tainted_mutex);
@@ -167,6 +174,11 @@ void ENode::refresh()
             {
                 eprintf("Peer untainting failed.\r\n");
                 calib_ts_ref = false;
+                {
+                    timespec mon_ts;
+                    ocall_timespec_get(&mon_ts);
+                    ocall_timespec_print(&mon_ts, this->port, CALIB);
+                }
             }
         }
         else
@@ -205,6 +217,9 @@ ENode::ENode(int _port):port(_port), stop(false),
     aex_args.count_aex = count_aex;
     aex_args.monitor_aex = monitor_aex;
     
+    aex_args.calib_ts_ref = &calib_ts_ref;
+    aex_args.calib_count = &calib_count;
+
     incrementNonce();
     //randombytes_buf(key, sizeof(key));
     const char* test_key = "b52c505a37d78eda5dd34f20c22540ea1b58963cf8e5bf8ffa85f9f2492505b4";
@@ -525,6 +540,11 @@ int ENode::handle_message(const void* buff, size_t buff_len, char* ip, uint16_t 
                 ts_ref=curr_ts;
             }
             tainted = false;
+            {
+                timespec mon_ts;
+                ocall_timespec_get(&mon_ts);
+                ocall_timespec_print(&mon_ts, this->port, OK);
+            }
             sgx_thread_cond_signal(&untainted_cond);
             sgx_thread_mutex_unlock(&tainted_mutex);
             break;
@@ -590,6 +610,11 @@ bool ENode::calibrate()
     }
     eprintf("Calibration done.\r\n");
     tainted = false;
+    {
+        timespec mon_ts;
+        ocall_timespec_get(&mon_ts);
+        ocall_timespec_print(&mon_ts, this->port, OK);
+    }
     return true;
 }
 
@@ -779,6 +804,11 @@ bool ENode::monitor_rdtsc()
         eprintf("Discalibrated! %f %d %f\r\n",(double)add_count_ref*(1-ACCURACY),add_count,(double)add_count_ref*(1+ACCURACY));
         calib_count = false;
         calib_ts_ref = false;
+        {
+            timespec mon_ts;
+            ocall_timespec_get(&mon_ts);
+            ocall_timespec_print(&mon_ts, this->port, CALIB);
+        }
     }
     return calib_count;
 }

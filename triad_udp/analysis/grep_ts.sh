@@ -6,3 +6,4 @@ egrep "\[Node [0-9]*\]> (Node Time|Ref\. Time)" $LOG_PATH/$1.log > $OUT_PATH/$1-
 egrep "\[utrst-Handler [0-9]*\]> TS Time" $LOG_PATH/$1.log > $OUT_PATH/$1-aex.log
 egrep "\[utrst-ENode [0-9]*\]> TS Time" $LOG_PATH/$1.log > $OUT_PATH/$1-ut-node.log
 egrep "\[utrst-TA [0-9]*\]> TS Time" $LOG_PATH/$1.log > $OUT_PATH/$1-ut-ta.log
+egrep "\[utrst-StateSwitch [0-9]*\]> [a-zA-Z]* Time" $LOG_PATH/$1.log > $OUT_PATH/$1-states.log

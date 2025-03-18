@@ -42,10 +42,16 @@ try:
     ut_ta_df = pd.read_csv(f, header=None, sep=' ')
 except Exception as e:
   print(f'Error reading {file}-ut-ta.log: {e}\n')
+try:
+  with open(f'out/ts/{file}-states.log', 'r') as f:
+    states_df = pd.read_csv(f, header=None, sep=' ')
+except Exception as e:
+  print(f'Error reading {file}-states.log: {e}\n')
 print(df)
 print(aex_df)
 print(ut_node_df)
 print(ut_ta_df)
+print(states_df)
 
 aex_df.drop(columns=[0,3], inplace=True)
 aex_df.columns = ['ID','type', 'date', "time","TZ"]
@@ -61,6 +67,12 @@ ut_node_df.drop(columns=[0,3], inplace=True)
 ut_node_df.columns = ['ID','type', 'date', "time","TZ"]
 ut_node_df["datetime"]=pd.to_datetime(ut_node_df["date"]+" "+ut_node_df["time"])
 print(ut_node_df)
+
+states_df.drop(columns=[0,3], inplace=True)
+states_df.columns = ['ID','type', 'date', "time","TZ"]
+states_df["datetime"]=pd.to_datetime(states_df["date"]+" "+states_df["time"])
+states_df["type"].replace({"OK": 0, "Tainted": 1, "Calib":2}, inplace=True)
+print(states_df)
 
 df.drop(columns=[0,3], inplace=True)
 df.columns = ['ID','type', 'date', "time","TZ"]
@@ -80,9 +92,10 @@ merged["datetime_ref"]=(merged["datetime_ref"]-ref_datetime)/pd.Timedelta('1s')
 aex_df["datetime"]=(aex_df["datetime"]-ref_datetime)/pd.Timedelta('1s')
 ut_ta_df["datetime"]=(ut_ta_df["datetime"]-ref_datetime)/pd.Timedelta('1s')
 ut_node_df["datetime"]=(ut_node_df["datetime"]-ref_datetime)/pd.Timedelta('1s')
+states_df["datetime"]=(states_df["datetime"]-ref_datetime)/pd.Timedelta('1s')
 
 print(node_ts, ref_ts, merged)
-fig, ax = plt.subplots(nrows=4, sharex=True)
+fig, ax = plt.subplots(nrows=5, sharex=True)
 colors=["tab:blue","tab:orange","tab:green"]
 for group, color in zip(merged.groupby("ID_node"), colors):
   ax[0].plot(group[1]["datetime_ref"], group[1]["drift"], marker='+', markersize=3, linestyle="-", linewidth=0.5, label=f"Node {group[0][:-2]}", color=color)
@@ -95,6 +108,9 @@ for (idx, group), color in zip(enumerate(ut_ta_df.groupby("ID")),colors):
 
 for (idx, group), color in zip(enumerate(ut_node_df.groupby("ID")),colors):
   ax[3].step(group[1]["datetime"], np.cumsum(np.ones(len(group[1]["datetime"]))), linestyle="-", linewidth=0.5, label=f"Node {group[0][:-2]}", color=color, where='post')
+
+for (idx, group), color in zip(enumerate(states_df.groupby("ID")),colors):
+  ax[4].step(group[1]["datetime"], group[1]["type"], linestyle="-", linewidth=0.5, label=f"Node {group[0][:-2]}", color=color, where='post')
 
 ax[1].grid(True)
 ax[1].grid(which='minor', linestyle=':', linewidth='0.5')
@@ -112,6 +128,11 @@ ax[3].grid(which='minor', linestyle=':', linewidth='0.5')
 ax[3].grid(which='major', linestyle='-', linewidth='0.5')
 ax[3].minorticks_on()
 ax[3].set_ylim(0)
+
+ax[4].grid(True)
+ax[4].grid(which='major', linestyle='-', linewidth='0.5')
+ax[4].set_yticks([0,1,2])
+ax[4].set_yticklabels(["OK","Tainted","Calib"])
 
 ax[3].set_xlabel('reference time (s)')
 ax[0].set_ylabel('drift (ms)')

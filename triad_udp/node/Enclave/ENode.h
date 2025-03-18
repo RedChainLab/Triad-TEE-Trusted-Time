@@ -80,6 +80,9 @@ typedef struct {
 
     long long int* count_aex;
     long long int* monitor_aex;
+
+    bool* calib_ts_ref;
+    bool* calib_count;
 }aex_handler_args_t;
 
 typedef struct {
