@@ -95,19 +95,20 @@ ut_node_df["datetime"]=(ut_node_df["datetime"]-ref_datetime)/pd.Timedelta('1s')
 states_df["datetime"]=(states_df["datetime"]-ref_datetime)/pd.Timedelta('1s')
 
 # print(node_ts, ref_ts, merged)
-fig, ax = plt.subplots(nrows=5, sharex=True)
+NB_FIGS=5
+fig, ax = plt.subplots(nrows=NB_FIGS, sharex=True, figsize=(9, 1.5*NB_FIGS), dpi=1000)
 colors=["tab:blue","tab:orange","tab:green"]
 for group, color in zip(merged.groupby("ID_node"), colors):
-  ax[0].plot(group[1]["datetime_ref"], group[1]["drift"], marker='+', markersize=3, linestyle="-", linewidth=0.5, label=f"Node {group[0][:-2]}", color=color)
+  ax[0].plot(group[1]["datetime_ref"], group[1]["drift"], marker='+', markersize=3, linestyle="-", linewidth=0.5, label=f"Node {1+int(group[0][:-2])%12345}", color=color)
 
 for (idx, group), color in zip(enumerate(aex_df.groupby("ID")),colors):
-  ax[1].step(group[1]["datetime"], np.cumsum(np.ones(len(group[1]["datetime"]))), linestyle="-", linewidth=0.5, label=f"Node {group[0][:-2]}", color=color)
+  ax[1].step(group[1]["datetime"], np.cumsum(np.ones(len(group[1]["datetime"]))), linestyle="-", linewidth=0.5, label=f"Node {1+int(group[0][:-2])%12345}", color=color)
 
 for (idx, group), color in zip(enumerate(ut_ta_df.groupby("ID")),colors):
-  ax[2].step(group[1]["datetime"], np.cumsum(np.ones(len(group[1]["datetime"]))), linestyle="-", linewidth=0.5, label=f"Node {group[0][:-2]}", color=color, where='post')
+  ax[2].step(group[1]["datetime"], np.cumsum(np.ones(len(group[1]["datetime"]))), linestyle="-", linewidth=0.5, label=f"Node {1+int(group[0][:-2])%12345}", color=color, where='post')
 
 for (idx, group), color in zip(enumerate(ut_node_df.groupby("ID")),colors):
-  ax[3].step(group[1]["datetime"], np.cumsum(np.ones(len(group[1]["datetime"]))), linestyle="-", linewidth=0.5, label=f"Node {group[0][:-2]}", color=color, where='post')
+  ax[3].step(group[1]["datetime"], np.cumsum(np.ones(len(group[1]["datetime"]))), linestyle="-", linewidth=0.5, label=f"Node {1+int(group[0][:-2])%12345}", color=color, where='post')
 
 for (idx, group), color in zip(enumerate(states_df.groupby("ID")),colors):
   ax[4].step(group[1]["datetime"], group[1]["type"], linestyle="-", linewidth=0.5, label=f"Node {group[0][:-2]}", color=color, where='post')
@@ -134,7 +135,10 @@ ax[4].grid(which='major', linestyle='-', linewidth='0.5')
 ax[4].set_yticks([0,1,2,3])
 ax[4].set_yticklabels(["OK","Tainted","RefCalib","FullCalib"])
 
-ax[3].set_xlabel('reference time (s)')
+ax[4].set_xlabel('reference time (s)')
+ax[4].set_xticks(np.arange(0, math.ceil(merged["datetime_ref"].max()), 120))
+ax[4].set_xlim(0, math.ceil(merged["datetime_ref"].max()))
+ax[4].set_xticks(np.arange(0, math.ceil(merged["datetime_ref"].max()), 30), minor=True)
 ax[0].set_ylabel('drift (ms)')
 ax[1].set_ylabel('\#AEX')
 ax[2].set_ylabel('\#TA untainting')
@@ -144,7 +148,7 @@ ax[0].grid(True)
 ax[0].grid(which='minor', linestyle=':', linewidth='0.5')
 ax[0].grid(which='major', linestyle='-', linewidth='0.5')
 ax[0].minorticks_on()
-ax[0].legend()
+ax[2].legend(loc='lower right', fontsize='small')
 if log:
   ax[0].set_yscale('log')
 fig.savefig(f'fig/{file}{"-log" if log else ""}.png', bbox_inches='tight', dpi=1200)
