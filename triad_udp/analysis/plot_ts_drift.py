@@ -13,7 +13,7 @@ plt.rcParams.update(params)
 
 # Files in out/count directory are in the naming format count-<timestamp>-<sgx_type>-<sleep_type>-<sleep_time_secs>-<repeat_id>.csv
 # Get <sleep_type> <sleep_time_secs> from command line arguments
-
+vlines=[]
 if len(sys.argv) > 1:
   file = sys.argv[1]
 if len(sys.argv) > 2:
