@@ -11,15 +11,13 @@ params = {'text.usetex' : True,
           }
 plt.rcParams.update(params) 
 
-log=False
-
 # Files in out/count directory are in the naming format count-<timestamp>-<sgx_type>-<sleep_type>-<sleep_time_secs>-<repeat_id>.csv
 # Get <sleep_type> <sleep_time_secs> from command line arguments
 
 if len(sys.argv) > 1:
   file = sys.argv[1]
-elif len(sys.argv) > 2:
-  log = (sys.argv[2] == "1")
+if len(sys.argv) > 2:
+  vlines=[int(x) for x in sys.argv[2].split(",")]
 
 #print(files_timestamp)
 try:
@@ -122,13 +120,13 @@ ax[2].grid(True)
 ax[2].grid(which='minor', linestyle=':', linewidth='0.5')
 ax[2].grid(which='major', linestyle='-', linewidth='0.5')
 ax[2].minorticks_on()
-ax[2].set_ylim(0)
+ax[2].set_ylim(-0.5)
 
 ax[3].grid(True)
 ax[3].grid(which='minor', linestyle=':', linewidth='0.5')
 ax[3].grid(which='major', linestyle='-', linewidth='0.5')
 ax[3].minorticks_on()
-ax[3].set_ylim(0)
+ax[3].set_ylim(-100)
 
 ax[4].grid(True)
 ax[4].grid(which='major', linestyle='-', linewidth='0.5')
@@ -136,9 +134,9 @@ ax[4].set_yticks([0,1,2,3])
 ax[4].set_yticklabels(["OK","Tainted","RefCalib","FullCalib"])
 
 ax[4].set_xlabel('reference time (s)')
-ax[4].set_xticks(np.arange(0, math.ceil(merged["datetime_ref"].max()), 120))
+ax[4].set_xticks(np.arange(0, math.ceil(merged["datetime_ref"].max()+1), 120))
 ax[4].set_xlim(0, math.ceil(merged["datetime_ref"].max()))
-ax[4].set_xticks(np.arange(0, math.ceil(merged["datetime_ref"].max()), 30), minor=True)
+ax[4].set_xticks(np.arange(0, math.ceil(merged["datetime_ref"].max()+1), 30), minor=True)
 ax[0].set_ylabel('drift (ms)')
 ax[1].set_ylabel('\#AEX')
 ax[2].set_ylabel('\#TA untainting')
@@ -149,9 +147,12 @@ ax[0].grid(which='minor', linestyle=':', linewidth='0.5')
 ax[0].grid(which='major', linestyle='-', linewidth='0.5')
 ax[0].minorticks_on()
 ax[2].legend(loc='lower right', fontsize='small')
-if log:
-  ax[0].set_yscale('log')
-fig.savefig(f'fig/{file}{"-log" if log else ""}.png', bbox_inches='tight', dpi=1200)
+
+for vline in vlines:
+  for a in ax:
+    a.axvline(x=vline, color='r', linestyle='--', linewidth=0.5)
+
+fig.savefig(f'fig/{file}.png', bbox_inches='tight', dpi=1200)
 
 def compute_state_durations(states_df, state_value):
   state_df = states_df.copy()
