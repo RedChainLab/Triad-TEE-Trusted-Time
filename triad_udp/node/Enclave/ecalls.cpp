@@ -6,7 +6,7 @@
 
 extern std::map<int /*port*/, ENode*> nodes;
 
-int ecall_init(uint16_t _port)
+int ecall_init(uint16_t _port, int _sleep_attack_ms)
 {
     printf("%sInitializing enclave node...\r\n", ENCLAVE_MGR);
     if(nodes.find(_port) != nodes.end())
@@ -15,7 +15,7 @@ int ecall_init(uint16_t _port)
         return SOCKET_ALREADY_EXISTS;
     }
     printf("%sENode does not exist yet. Creating...\r\n", ENCLAVE_MGR);
-    nodes.emplace(_port, new ENode(_port));
+    nodes.emplace(_port, new ENode(_port, _sleep_attack_ms));
     return SUCCESS;
 }
 

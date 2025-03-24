@@ -38,7 +38,7 @@ enclave {
     from "sgx_socket.edl" import *;
 
     trusted {
-        public int ecall_init(uint16_t port);
+        public int ecall_init(uint16_t port, int sleep_attack_ms);
         public int ecall_destroy(uint16_t port);
         public int ecall_stop(uint16_t port);
         public int ecall_monitor(uint16_t port);

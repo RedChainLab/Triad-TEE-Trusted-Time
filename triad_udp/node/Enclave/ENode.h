@@ -131,7 +131,7 @@ public:
 
     timespec get_timestamp();
 
-    ENode(int _port);
+    ENode(int _port, int _sleep_attack_ms=0);
     ~ENode();
 
 private:
@@ -140,6 +140,7 @@ private:
     std::pair<std::string, uint16_t> time_authority;
 
     int sleep_time;
+    int sleep_attack_ms;
     int verbosity;
 
     long long tsc;

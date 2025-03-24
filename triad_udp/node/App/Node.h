@@ -11,7 +11,7 @@
 
 class Node {
 public:
-    static Node* get_instance(uint16_t port, int core_rdTSC);
+    static Node* get_instance(uint16_t port, int core_rdTSC, int sleep_attack_ms=0);
     static void destroy_instance(uint16_t port);
     timespec get_timestamp();
     void print_timestamp();
@@ -20,11 +20,12 @@ public:
     bool stop;
 private:
     uint16_t port;
+    int sleep_attack_ms;
     int core_rdTSC;
     std::map<std::pair<std::string, uint16_t>, int> siblings;
     std::vector<std::thread> threads;
 
-    Node(uint16_t _port, int _core_rdTSC);
+    Node(uint16_t _port, int _core_rdTSC, int _sleep_attack_ms=0);
     ~Node();
     int initialize_enclave(const sgx_uswitchless_config_t* us_config);
     static std::map<int, Node*> nodes;

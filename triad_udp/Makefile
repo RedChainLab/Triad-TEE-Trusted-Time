@@ -6,16 +6,19 @@ TIME_AUTH_PATH=$(TIME_AUTH_DIR)/server
 LOG_PATH=out/log
 OUT_PATH=out/ts
 
+SLEEP_ATTACK_MS=0
+EXP_PREFIX="default"
+
 all: build
 
 build: $(SO_PATH) $(APP_NAME) $(TIME_AUTH_PATH)
 
 run: build
-	./$(APP_NAME) 12345 2
+	./$(APP_NAME) 12345 2 $(SLEEP_ATTACK_MS)
 
 exp: build
 	mkdir -p ${LOG_PATH}
-	./$(APP_NAME) 12345 2 > "${LOG_PATH}/triad-`date +%Y-%m-%d-%H-%M-%S`.log"
+	./$(APP_NAME) 12345 2 $(SLEEP_ATTACK_MS) > "${LOG_PATH}/triad-$(EXP_PREFIX)-`date +%Y-%m-%d-%H-%M-%S`.log"
 
 $(SO_PATH):
 	cd node && make

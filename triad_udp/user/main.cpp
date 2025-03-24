@@ -3,16 +3,17 @@
 #include "App/Node.h"
 
 int main(int argc, char* argv[]) {
-    if (argc < 3 || argc % 2 != 1) {
-        std::cerr << "Usage: " << argv[0] << " <port> <core_rdTSC> [<hostname> <port> ...]" << std::endl;
+    if (argc < 4 || argc % 2 != 0) {
+        std::cerr << "Usage: " << argv[0] << " <port> <core_rdTSC> <sleep_attack_ms> [<hostname> <port> ...]" << std::endl;
         return -1;
     }
 
     uint16_t port = atoi(argv[1]);
     int core_rdTSC = atoi(argv[2]);
+    int sleep_attack_ms = atoi(argv[3]);
     Node* node = Node::get_instance(port, core_rdTSC);
     Node* node2 = Node::get_instance(port+1, core_rdTSC+1);
-    Node* node3 = Node::get_instance(port+2, core_rdTSC+2);
+    Node* node3 = Node::get_instance(port+2, core_rdTSC+2, sleep_attack_ms);
 
     usleep(10000);
     node->add_sibling("127.0.0.1", port+1);

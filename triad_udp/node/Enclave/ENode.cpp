@@ -195,10 +195,10 @@ void ENode::refresh()
     eprintf("Refresh stopped.\r\n");
 }
 
-ENode::ENode(int _port):port(_port), stop(false), 
+ENode::ENode(int _port, int _sleep_attack_ms):port(_port), stop(false), 
     add_count(0), total_aex_count(0), calib_count(false), calib_ts_ref(false),
     tainted(true), aex_count(0), monitor_aex_count(0), 
-    sock(-1), time_authority(std::make_pair("127.0.0.1",12340)),sleep_time(500), verbosity(0), 
+    sock(-1), time_authority(std::make_pair("127.0.0.1",12340)),sleep_time(500), sleep_attack_ms(_sleep_attack_ms), verbosity(0), 
     monitor_stopped(false), refresh_stopped(false), trigger_stopped(false)
 {
     eprintf("Creating ENode instance...\r\n");
@@ -507,9 +507,9 @@ int ENode::handle_message(const void* buff, size_t buff_len, char* ip, uint16_t 
                 timestamp.tv_sec += ts_ref.tv_sec;
                 timestamp.tv_nsec = (total_nsec+ts_ref.tv_nsec)%1000000000; 
                 eprintf("Sending untainting ts: %ld.%ld\r\n", timestamp.tv_sec, timestamp.tv_nsec);
-                timespec mon_ts;
-                ocall_timespec_get(&mon_ts);
-                ocall_timespec_print(&mon_ts, this->port, ENODE);
+                // timespec mon_ts;
+                // ocall_timespec_get(&mon_ts);
+                // ocall_timespec_print(&mon_ts, this->port, ENODE);
                 char send_buff[1024] = {0};
                 memcpy(send_buff, UNTAINTING_STR, strlen(UNTAINTING_STR));
                 memcpy(send_buff+strlen(UNTAINTING_STR), &timestamp, sizeof(timespec));
@@ -653,7 +653,7 @@ bool ENode::calibrate_drift()
     {
         {
             eprintf("Sending slow drift message %d...\r\n", nb_ok_runs+1);
-            send_recv_drift_message(sleep_time_ms);
+            send_recv_drift_message(sleep_time_ms,sleep_attack_ms>0?sleep_attack_ms:0);
         }
         eprintf("Updating tsc for 1s...\r\n");
         long long int reference_tsc=tsc=rdtscp();
@@ -719,7 +719,7 @@ bool ENode::calibrate_drift()
     {
         {
             eprintf("Sending fast drift message %d...\r\n", nb_ok_runs+1);
-            send_recv_drift_message(0);
+            send_recv_drift_message(0, sleep_attack_ms<0?-sleep_attack_ms:0);
         }
         eprintf("Updating tsc for 1s...\r\n");
         long long int reference_tsc=tsc=rdtscp();
