@@ -92,24 +92,50 @@ ut_ta_df["datetime"]=(ut_ta_df["datetime"]-ref_datetime)/pd.Timedelta('1s')
 ut_node_df["datetime"]=(ut_node_df["datetime"]-ref_datetime)/pd.Timedelta('1s')
 states_df["datetime"]=(states_df["datetime"]-ref_datetime)/pd.Timedelta('1s')
 
+mem_aex_df=aex_df.copy()
+
+df_list=[aex_df, ut_ta_df, ut_node_df]
+for idx, a_df in enumerate(df_list):
+# Add a row per node in aex_df with the datetime as merged["datetime_ref"].max() + 1 second
+  unique_ids = a_df['ID'].unique()
+  new_rows = pd.DataFrame({
+    'ID': unique_ids,
+    'datetime': [merged["datetime_ref"].max() + 1] * len(unique_ids)
+  })
+  a_df = pd.concat([a_df, new_rows], ignore_index=True)
+  df_list[idx] = a_df
+aex_df, ut_ta_df, ut_node_df = df_list
+
+# Duplicate the last record for each node in states_df with a new row at datetime of merged["datetime_ref"].max + 1
+unique_ids = states_df['ID'].unique()
+new_rows = states_df.groupby('ID').tail(1).copy()
+new_rows['datetime'] = merged["datetime_ref"].max() + 1
+states_df = pd.concat([states_df, new_rows], ignore_index=True)
+
 # print(node_ts, ref_ts, merged)
 NB_FIGS=5
-fig, ax = plt.subplots(nrows=NB_FIGS, sharex=True, figsize=(9, 1.5*NB_FIGS), dpi=1000)
+fig_ax = [plt.subplots(figsize=(9,1.5)) for _ in range(NB_FIGS)]
+
+fig, ax = zip(*fig_ax)
+
 colors=["tab:blue","tab:orange","tab:green"]
+linestyles=["-","--",":"]
 for group, color in zip(merged.groupby("ID_node"), colors):
   ax[0].plot(group[1]["datetime_ref"], group[1]["drift"], marker='+', markersize=3, linestyle="-", linewidth=0.5, label=f"Node {1+int(group[0][:-2])%12345}", color=color)
 
-for (idx, group), color in zip(enumerate(aex_df.groupby("ID")),colors):
-  ax[1].step(group[1]["datetime"], np.cumsum(np.ones(len(group[1]["datetime"]))), linestyle="-", linewidth=0.5, label=f"Node {1+int(group[0][:-2])%12345}", color=color)
+for (idx, group), color, linestyle in zip(enumerate(aex_df.groupby("ID")), colors, linestyles):
+  ax[1].step(group[1]["datetime"], np.cumsum(np.ones(len(group[1]["datetime"]))), linestyle=linestyle, label=f"Node {1+int(group[0][:-2])%12345}", color=color)
 
-for (idx, group), color in zip(enumerate(ut_ta_df.groupby("ID")),colors):
-  ax[2].step(group[1]["datetime"], np.cumsum(np.ones(len(group[1]["datetime"]))), linestyle="-", linewidth=0.5, label=f"Node {1+int(group[0][:-2])%12345}", color=color, where='post')
+for (idx, group), color, linestyle in zip(enumerate(ut_ta_df.groupby("ID")), colors, linestyles):
+  ax[2].step(group[1]["datetime"], np.cumsum(np.ones(len(group[1]["datetime"]))), linestyle=linestyle, label=f"Node {1+int(group[0][:-2])%12345}", color=color, where='post')
 
-for (idx, group), color in zip(enumerate(ut_node_df.groupby("ID")),colors):
-  ax[3].step(group[1]["datetime"], np.cumsum(np.ones(len(group[1]["datetime"]))), linestyle="-", linewidth=0.5, label=f"Node {1+int(group[0][:-2])%12345}", color=color, where='post')
+for (idx, group), color, linestyle in zip(enumerate(ut_node_df.groupby("ID")), colors, linestyles):
+  ax[3].step(group[1]["datetime"], np.cumsum(np.ones(len(group[1]["datetime"]))), linestyle=linestyle, label=f"Node {1+int(group[0][:-2])%12345}", color=color, where='post')
 
-for (idx, group), color in zip(enumerate(states_df.groupby("ID")),colors):
-  ax[4].step(group[1]["datetime"], group[1]["type"], linestyle="-", linewidth=0.5, label=f"Node {group[0][:-2]}", color=color, where='post')
+for (idx, group), color, linestyle in zip(enumerate(states_df.groupby("ID")), colors, linestyles):
+  ax[4].step(group[1]["datetime"], group[1]["type"], linestyle=linestyle, label=f"Node {1+int(group[0][:-2])%12345}", linewidth=0.5, color=color, where='post', 
+            #  zorder=4-idx
+            )
 
 ax[1].grid(True)
 ax[1].grid(which='minor', linestyle=':', linewidth='0.5')
@@ -133,14 +159,19 @@ ax[4].grid(which='major', linestyle='-', linewidth='0.5')
 ax[4].set_yticks([0,1,2,3])
 ax[4].set_yticklabels(["OK","Tainted","RefCalib","FullCalib"])
 
-ax[4].set_xlabel('reference time (s)')
-ax[4].set_xticks(np.arange(0, math.ceil(merged["datetime_ref"].max()+1), 120))
-ax[4].set_xlim(0, math.ceil(merged["datetime_ref"].max()))
-ax[4].set_xticks(np.arange(0, math.ceil(merged["datetime_ref"].max()+1), 30), minor=True)
-ax[0].set_ylabel('drift (ms)')
-ax[1].set_ylabel('\#AEX')
-ax[2].set_ylabel('\#TA untainting')
-ax[3].set_ylabel('\#Peer untainting')
+MAJOR_TICKS=120 #3600 #60
+MINOR_TICKS=30 #600 #10
+for axis in ax:
+  axis.set_xlabel('Reference time (s)')
+  axis.set_xticks(np.arange(0, math.ceil(merged["datetime_ref"].max()+1), MAJOR_TICKS))
+  axis.set_xlim(0, math.ceil(merged["datetime_ref"].max()))
+  axis.set_xticks(np.arange(0, math.ceil(merged["datetime_ref"].max()+1), MINOR_TICKS), minor=True)
+
+ax[0].set_ylabel('Drift (ms)')
+ax[1].set_ylabel('AEX count')
+ax[2].set_ylabel('Message count to TA')
+ax[3].set_ylabel('Message count to peers  .')
+ax[4].set_ylabel('Node state')
 ax[0].set_xlim(0)
 ax[0].grid(True)
 ax[0].grid(which='minor', linestyle=':', linewidth='0.5')
@@ -152,7 +183,9 @@ for vline in vlines:
   for a in ax:
     a.axvline(x=vline, color='r', linestyle='--', linewidth=0.5)
 
-fig.savefig(f'fig/{file}.png', bbox_inches='tight', dpi=1200)
+suffixes=["drift","aex","ut-ta","ut-node","states"]
+for f,suffix in zip(fig,suffixes):
+  f.savefig(f'fig/{file}-{suffix}.pdf', bbox_inches='tight', dpi=1200)
 
 def compute_state_durations(states_df, state_value):
   state_df = states_df.copy()
@@ -176,21 +209,67 @@ state_durations_df = pd.DataFrame({
   'FullCalib': fullcalib_durations
 }).fillna(0)
 state_durations_df["ID"]=state_durations_df.index.str[:-2]
+state_durations_df["ID"]=(state_durations_df["ID"].astype(int)+1)%12345
+state_durations_df["ID"]=state_durations_df["ID"].astype(str)
 state_durations_df.set_index("ID", inplace=True)
 
 # Plot the state durations
 fig2, ax2 = plt.subplots()
 state_durations_df_normalized = state_durations_df.div(state_durations_df.sum(axis=1), axis=0) * 100
 
-ax2.bar(state_durations_df_normalized.index, state_durations_df_normalized['OK'], color='tab:blue', label='OK', edgecolor='black')
-ax2.bar(state_durations_df_normalized.index, state_durations_df_normalized['Tainted'], bottom=state_durations_df_normalized['OK'], color='tab:orange', label='Tainted', edgecolor='black')
-ax2.bar(state_durations_df_normalized.index, state_durations_df_normalized['RefCalib'], bottom=state_durations_df_normalized['OK'] + state_durations_df_normalized['Tainted'], color='tab:green', label='GET TA Time', edgecolor='black')
-ax2.bar(state_durations_df_normalized.index, state_durations_df_normalized['FullCalib'], bottom=state_durations_df_normalized['OK'] + state_durations_df_normalized['Tainted'] + state_durations_df_normalized['RefCalib'], color='tab:red', label='GET TA Clock Speed', edgecolor='black')
+bar_width = 0.2
+index = np.arange(len(state_durations_df_normalized))
+
+hatching = ['/', 'xx', '\\', 'o']
+
+ax2.bar(index, state_durations_df_normalized['OK'], bar_width, color='tab:blue', label='OK', edgecolor='black', hatch=hatching[0])
+ax2.bar(index + bar_width, state_durations_df_normalized['Tainted'], bar_width, color='tab:orange', label='Tainted timestamp', edgecolor='black', hatch=hatching[1])
+ax2.bar(index + 2 * bar_width, state_durations_df_normalized['RefCalib'], bar_width, color='tab:green', label='Time ref. calibration', edgecolor='black', hatch=hatching[2])
+ax2.bar(index + 3 * bar_width, state_durations_df_normalized['FullCalib'], bar_width, color='tab:red', label='Full calibration', edgecolor='black', hatch=hatching[3])
+
 ax2.set_xlabel('Node ID')
-ax2.set_ylabel('Duration (\%)')
+ax2.set_xticks(index + 1.5 * bar_width)
+ax2.set_xticklabels(state_durations_df_normalized.index)
+ax2.set_ylabel('Duration (\\%)')
+ax2.set_ylim(0.001, 100)
+ax2.set_yscale('log')
 ax2.grid(axis='y', linestyle='-', linewidth='0.5')
 ax2.grid(axis='y', which='minor', linestyle=':', linewidth='0.5')
 ax2.minorticks_on()
 handles, labels = ax2.get_legend_handles_labels()
-ax2.legend(handles[::-1], labels[::-1], title='State', loc='lower center')
-fig2.savefig(f'fig/{file}-state-durations.png', bbox_inches='tight', dpi=1200)
+ax2.legend(handles, labels, title='State', loc='upper center', fontsize='small', ncol=4, handleheight=1.5, bbox_to_anchor=(0.5, 1.15))
+fig2.savefig(f'fig/{file}-state-durations.pdf', bbox_inches='tight', dpi=1200)
+
+# Calculate delays between successive rows in aex_df
+mem_aex_df["delay"] = mem_aex_df["datetime"].groupby(aex_df["ID"]).diff().fillna(0)
+
+# Plot histogram of delays
+fig3, ax3 = plt.subplots(figsize=(4.5, 2.5))
+for group, color, linestyle in zip(mem_aex_df.groupby("ID"),colors, linestyles):
+  ax3.hist(group[1]["delay"], bins=100, color=color, linestyle=linestyle, cumulative=True, histtype='step', density=True, label=f"Node {1+int(group[0][:-2])%12345}")
+ax3.set_xlabel('Delay between AEXs (s)')
+ax3.set_ylabel('Observed frequency (\\%)')
+ax3.grid(True)
+ax3.grid(which='minor', linestyle=':', linewidth='0.5')
+ax3.grid(which='major', linestyle='-', linewidth='0.5')
+ax3.minorticks_on()
+ax3.set_xlim(0)
+
+LOW_INTERRUPTS = False
+if LOW_INTERRUPTS:
+  max_x_value = math.ceil(mem_aex_df["delay"].max())
+  closest_multiple_of_60 = (max_x_value // 60 + 1) * 60
+
+  ax3.set_xticks(np.arange(0, closest_multiple_of_60 + 1, 60))
+  ax3.set_xlim(0, closest_multiple_of_60)
+  ax3.set_xticks(np.arange(0, closest_multiple_of_60 + 1, 10), minor=True)
+else:
+  ax3.set_xticks(np.arange(0, 2.01, 0.2))
+  ax3.set_xlim(0, 2)
+  ax3.set_xticks(np.arange(0, 2.01, 0.05), minor=True)
+  # ax3.set_xlim(0.01, 10)
+  # ax3.set_xscale('log')
+
+handles, labels = ax3.get_legend_handles_labels()
+ax3.legend(handles, labels, loc='upper left', fontsize='small')
+fig3.savefig(f'fig/{file}-aex-delays-histogram.pdf', bbox_inches='tight', dpi=1200)
