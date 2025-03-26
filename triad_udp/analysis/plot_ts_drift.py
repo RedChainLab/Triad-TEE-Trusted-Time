@@ -120,8 +120,10 @@ fig, ax = zip(*fig_ax)
 
 colors=["tab:blue","tab:orange","tab:green"]
 linestyles=["-","--",":"]
-for group, color in zip(merged.groupby("ID_node"), colors):
-  ax[0].plot(group[1]["datetime_ref"], group[1]["drift"], marker='+', markersize=3, linestyle="-", linewidth=0.5, label=f"Node {1+int(group[0][:-2])%12345}", color=color)
+for (idx, group), color in zip(enumerate(merged.groupby("ID_node")), colors):
+  ax[0].plot(group[1]["datetime_ref"], group[1]["drift"], marker='+', markersize=3, linestyle="-", linewidth=0.5, label=f"Node {1+int(group[0][:-2])%12345}", color=color,
+              zorder=4-idx
+             )
 
 for (idx, group), color, linestyle in zip(enumerate(aex_df.groupby("ID")), colors, linestyles):
   ax[1].step(group[1]["datetime"], np.cumsum(np.ones(len(group[1]["datetime"]))), linestyle=linestyle, label=f"Node {1+int(group[0][:-2])%12345}", color=color)
@@ -168,7 +170,7 @@ ax[2].legend(loc='lower right', fontsize='small')
 
 for vline in vlines:
   for a in ax:
-    a.axvline(x=vline, color='r', linestyle='--')
+    a.axvline(x=vline, color='r', linestyle='--', zorder=100)
 
 suffixes=["drift","aex","ut-ta","ut-node","states"]
 for f,suffix in zip(fig,suffixes):
