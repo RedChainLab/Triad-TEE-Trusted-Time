@@ -32,14 +32,16 @@
 #include <stdio.h>
 #include <sgx_trts_aex.h>
 #include <sgx_thread.h>
-#define SIZE 4096
+#define SIZE 65536
 
-long long timestamps;
-long long aex_count = 0;
-long long count = 0;
-long long int Countadd[SIZE];
-long long int Countadd_intervals[SIZE];
-int index = 0;
+long long int add_count = 0;
+long long int tsc = 0;
+
+long long int aex_count = 0;
+long long int monitor_aex_count = 0;
+
+long long int count_aex[SIZE];
+long long int monitor_aex[SIZE];
 
 # define BUFSIZ  8192
 
@@ -50,6 +52,17 @@ typedef struct {
     sgx_thread_mutex_t mutex;
 
 }cond_struct_t;
+
+typedef enum {
+    SYSCALL_SLEEP = 0,
+    O_READTSC_SLEEP = 1,
+    E_READTSC_SLEEP = 2,
+    C_ADDER_SLEEP = 3,
+    ASM_ADDER_SLEEP = 4,
+    SELF_MONITOR = 5,
+    AEX_SELF_MONITOR = 6,
+    AEX_ASM_SELF_MONITOR = 7
+}sleep_type_t;
 
 cond_struct_t cond = {0, 0, SGX_THREAD_COND_INITIALIZER, SGX_THREAD_MUTEX_INITIALIZER};
 
@@ -63,27 +76,47 @@ void t_print(const char *fmt, ...)
     ocall_print_string(buf);
 }
 
-static void my_aex_notify_handler(const sgx_exception_info_t *info, const void * args)
+
+inline void log_aex(long long int* arr, long long int& next_index){
+    if(next_index < SIZE)
+    {
+        arr[next_index++] = add_count;
+    }
+    else
+    {
+        t_print("Error: Array is full\n");
+    }
+}
+
+static void counter_aex_handler(const sgx_exception_info_t *info, const void * args)
 {
     /*
     a custom handler that will be called when an AEX occurs, storing the number of ADD operations (performed in another thread) in a global array. This allows you to 
     know when AEX occurs (the number of ADD operations increases linearly) and how often it occurs.
     */
-   (void)info;
-   (void)args;
-   Countadd[aex_count] = count;
-   Countadd_intervals[aex_count] = count - Countadd[aex_count-1];
-   aex_count++;
+    (void)info;
+    (void)args;
+    log_aex(count_aex, aex_count);
 }
 
-void printArray(long long int *arr){
+static void monitor_aex_handler(const sgx_exception_info_t *info, const void * args)
+{
+    /*
+    a custom handler that will be called when an AEX occurs, storing the number of ADD operations (performed in another thread) in a global array. This allows you to 
+    know when AEX occurs (the number of ADD operations increases linearly) and how often it occurs.
+    */
+    (void)info;
+    (void)args;
+    log_aex(monitor_aex, monitor_aex_count);
+}
+
+void printArray(long long int *arr, long long int size, long long int reference){
     /*
     Print a array of size SIZE, which contains the number of ADD operations performed before each AEX occurs.
     */
-    for(int i = 0; i < aex_count ; i++){
-        t_print("Countadd[%d] : %lld\n", i, arr[i]);
+    for(int i = 0; i < size ; i++){
+        t_print("%d;%lld\n", i, arr[i]-reference);
     }
-    t_print("\n\n");
 }
 
 void countADD(void){
@@ -93,55 +126,226 @@ void countADD(void){
     //see_pid("countADD");
     const char* args = NULL; 
     sgx_aex_mitigation_node_t node;
-    sgx_register_aex_handler(&node, my_aex_notify_handler, (const void*)args);
+    sgx_register_aex_handler(&node, counter_aex_handler, (const void*)args);
     cond_struct_t *c = &cond;
-    sgx_thread_mutex_lock(&c->mutex);
-    while (!c->isCounting) {
-        sgx_thread_cond_wait(&c->startCounting, &c->mutex);
-    }
-    sgx_thread_mutex_unlock(&c->mutex);
+    while (!c->isCounting);
     while(c->isCounting == 1){
-        count++; 
+        add_count++; 
     }
-    sgx_unregister_aex_handler(my_aex_notify_handler);
+    sgx_unregister_aex_handler(counter_aex_handler);
 }
 
+void loopOReadTSC(void){
+    /*
+    The function that will be called in another thread to perform ADD operations.
+    */
+    //see_pid("countTSC");
+    const char* args = NULL; 
+    sgx_aex_mitigation_node_t node;
+    sgx_register_aex_handler(&node, counter_aex_handler, (const void*)args);
+    cond_struct_t *c = &cond;
+    while (!c->isCounting);
+    while(c->isCounting){
+        ocall_readTSC(&add_count);
+    }
+    sgx_unregister_aex_handler(counter_aex_handler);
+}
 
-void main_thread(int sleep_time, int core_id, int set_aff, int sleep_inside_enclave){
+inline long long int rdtsc(void){
+    /*
+    Read the TSC register
+    */
+    unsigned int lo, hi;
+    __asm__ __volatile__("rdtscp" : "=a" (lo), "=d" (hi));
+    //t_print("lo: %d, hi: %d\n", lo, hi);
+    return ((uint64_t)hi << 32) | lo;
+}
+
+void loopEReadTSC(void){
+    /*
+    The function that will be called in another thread to perform ADD operations.
+    */
+    //see_pid("countTSC");
+    const char* args = NULL; 
+    sgx_aex_mitigation_node_t node;
+    sgx_register_aex_handler(&node, counter_aex_handler, (const void*)args);
+    cond_struct_t *c = &cond;
+    while (!c->isCounting);
+    while(c->isCounting){
+        add_count = rdtsc();
+    }
+    sgx_unregister_aex_handler(counter_aex_handler);
+}
+
+void main_thread(int sleep_time, int sleep_inside_enclave, int verbosity){
     /*
     the main thread that will be called by the application.
     */
-    //see_pid("main_thread");
     cond_struct_t *c = &cond;
-    /*    
+    
     const char* args = NULL; 
     sgx_aex_mitigation_node_t node;
-    sgx_register_aex_handler(&node, my_aex_notify_handler, (const void*)args);
-    */
-    sgx_thread_mutex_lock(&c->mutex);
-    c->isCounting = 1;
-    sgx_thread_cond_signal(&c->startCounting);
-    sgx_thread_mutex_unlock(&c->mutex);
-
-    if(sleep_inside_enclave){
-        for (int j = 0; j < 75*sleep_time; j++){
-            for(int i = 0; i < 10000000; i++){
-                
-            }
+    if(sleep_inside_enclave != SELF_MONITOR){
+        if(sleep_inside_enclave == AEX_SELF_MONITOR || sleep_inside_enclave == AEX_ASM_SELF_MONITOR){
+            sgx_register_aex_handler(&node, counter_aex_handler, (const void*)args);
+        }
+        else{
+            sgx_register_aex_handler(&node, monitor_aex_handler, (const void*)args);
         }
     }
-    else
-        ocall_sleep(&sleep_time);
     
-    //t_print("c->isCounting : %d\n", c->isCounting);
-    sgx_thread_mutex_lock(&c->mutex);
+    long long int reference = 0;
+    c->isCounting = 1;
+    switch(sleep_inside_enclave){
+        case SYSCALL_SLEEP:
+            do
+            {
+                reference = add_count;
+            } while(reference == 0);
+            ocall_sleep(&sleep_time);
+        break;
+        case O_READTSC_SLEEP:
+        {
+            do
+            {
+                reference = add_count;
+            } while(reference == 0);
+            ocall_readTSC(&reference);
+            while(tsc-reference < 3000000000*sleep_time){
+                ocall_readTSC(&tsc);
+            }
+        }
+        break;
+        case E_READTSC_SLEEP:
+        {
+            do
+            {
+                reference = add_count;
+            } while(reference == 0);
+            reference = rdtsc();
+            while(tsc-reference < 3000000000*sleep_time){
+                tsc = rdtsc();
+            }
+        }
+        break;
+        case C_ADDER_SLEEP:
+        {
+            do
+            {
+                reference = add_count;
+            } while(reference == 0);
+            for( long long int counter = 0; counter < 529*sleep_time; counter++){
+                for(int i = 0; i < 1000000; i++);
+            }
+        }
+        break;
+        case ASM_ADDER_SLEEP:
+        {
+            do
+            {
+                reference = add_count;
+            } while(reference == 0);
+            long long int counter = 3000000*sleep_time;
+            __asm__ volatile(
+                "mov %0, %%rcx\n\t"
+                "mov %1, %%rax\n\t"
+                "1: dec %%rax\n\t"
+                "mov %%rax, (%%rcx)\n\t"
+                "test %%rax, %%rax\n\t"
+                "jnz 1b"
+                :
+                : "r"(&counter), "r"(counter)
+                : "rcx", "rax"
+            );
+            //log_aex(count_aex, aex_count);
+        }
+        break;
+        case SELF_MONITOR:
+        {
+            long long int delta=0;
+            long long int THRESHOLD=600;
+            reference=rdtsc();
+            do{
+                long long int a=rdtsc();
+                do{
+                    add_count=rdtsc();
+                    delta=add_count-a;
+                    a=add_count;
+                } while(add_count-reference<3000000000*sleep_time && delta<THRESHOLD && delta>0);
+                if(delta>=THRESHOLD){
+                    log_aex(monitor_aex, monitor_aex_count);
+                }
+                else if(delta<0){
+                    t_print("Error: non-increasing TSC! delta=%lld\n", delta);
+                    break;
+                }
+            } while(add_count-reference<3000000000*sleep_time);
+        }
+        break;
+        case AEX_SELF_MONITOR:
+        {
+            reference=0;
+            long long int start_tsc=rdtsc();
+            long long int stop_tsc=3000000*sleep_time+start_tsc;
+            long long int current_tsc=reference;
+            do{
+                add_count++;
+                current_tsc=rdtsc();
+            } while(current_tsc<stop_tsc);
+        }
+        break;
+        case AEX_ASM_SELF_MONITOR:
+        {
+            reference=0;
+            long long int start_tsc=rdtsc();
+            long long int stop_tsc=3000000*sleep_time+start_tsc;
+            long long int current_tsc=reference;
+            asm volatile(
+                "movq %0, %%r8\n\t"
+                "movq %1, %%r9\n\t"
+                "movq $0, %%r10\n\t"
+
+                "1: rdtsc\n\t"
+                "shlq $32, %%rdx\n\t"
+                "orq %%rax, %%rdx\n\t"
+                "incq %%r10\n\t"
+                "movq %%r10, (%%r8)\n\t"
+                "cmpq %%r9, %%rdx\n\t"
+                "jl 1b\n\t"
+                :
+                : "r"(&add_count), "r"(stop_tsc)
+                : "rax", "rdx", "r8", "r9"
+            );
+        }
+        break;
+    }
     c->isCounting = 0;
-    sgx_thread_mutex_unlock(&c->mutex);
+    if(sleep_inside_enclave != SELF_MONITOR){
+        if(sleep_inside_enclave == AEX_SELF_MONITOR || sleep_inside_enclave == AEX_ASM_SELF_MONITOR){
+            sgx_unregister_aex_handler(counter_aex_handler);
+        }
+        else{
+            sgx_unregister_aex_handler(monitor_aex_handler);
+        }
+    }
 
-    //sgx_unregister_aex_handler(my_aex_notify_handler);  
-    printArray(Countadd);
-    printArray(Countadd_intervals);
-    t_print("Count : %lld\n", count);
-    t_print("Number of AEX : %d\n", aex_count);
-
+    if(verbosity>=1)
+    {
+        t_print("idx;count\n");
+        printArray(count_aex, aex_count, reference);
+    }
+    if(verbosity>=2)
+    {
+        t_print("idx;monitor_aex_count\n");
+        printArray(monitor_aex, monitor_aex_count, reference);
+    }
+    if(verbosity==1)
+    {
+        t_print("%lld;%lld\n", aex_count, add_count-reference);
+    }
+    if(verbosity>=2)
+    {
+        t_print("counter_aex_count;monitor_aex_count;final_count\n");
+        t_print("%lld;%lld;%lld\n", aex_count, monitor_aex_count, add_count-reference);
+    }
 }

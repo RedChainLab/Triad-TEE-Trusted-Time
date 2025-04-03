@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/MultiNodeTLS.dir/main.cpp.o CMakeFiles/MultiNodeTLS.dir/server.cpp.o CMakeFiles/MultiNodeTLS.dir/client.cpp.o CMakeFiles/MultiNodeTLS.dir/common.cpp.o -o MultiNodeTLS  /usr/lib/x86_64-linux-gnu/libssl.so /usr/lib/x86_64-linux-gnu/libcrypto.so -lpthread 

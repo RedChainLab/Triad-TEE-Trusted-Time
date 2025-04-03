@@ -29,16 +29,10 @@
  *
  */
 
-
-#ifdef M_TLS_SERVER
-#include "tls_server_t.h"
-#else
-#include "tls_client_t.h"
-#endif
-
-
+#include "../node/Enclave/Enclave_t.h"
 
 #include "sgx_trts.h"
+#include "sys/socket.h"
 
 /* support socket APIs inside enclave */
 
@@ -123,6 +117,29 @@ ssize_t recv(int fd, void *buf, size_t len, int flags)
     if (u_recv(&ret, fd, buf, len, flags) == SGX_SUCCESS)
         return ret;
 	
+    return -1;
+}
+
+ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const char* ip, int iplen, int port)
+{
+    ssize_t ret = 0;
+
+    if (u_sendto(&ret, sockfd, buf, len, flags, ip, iplen, port) == SGX_SUCCESS)
+        return ret;
+
+    return -1;
+}
+
+ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, char* ip, int iplen, int* port)
+{
+    ssize_t ret = 0;
+    //printf("[trst]> t_recvfrom: %d, %p, %d, %d\r\n", sockfd, buf, len, flags);
+    if (u_recvfrom(&ret, sockfd, buf, len, flags, ip, iplen, port) == SGX_SUCCESS)
+    {
+        //printf("[trst]> t_recvfrom: %d, %p, %d, %d, %s, %d, %d\r\n", sockfd, buf, len, flags, ip,  port);
+        return ret;
+    }
+
     return -1;
 }
 

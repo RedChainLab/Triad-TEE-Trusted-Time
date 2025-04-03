@@ -368,6 +368,7 @@ int socket (int, int, int);
 int socketpair (int, int, int, int [2]);
 
 int shutdown (int, int);
+int close (int);
 
 int bind (int, const struct sockaddr *, socklen_t);
 int connect (int, const struct sockaddr *, socklen_t);
@@ -380,8 +381,8 @@ int getpeername (int, struct sockaddr *__restrict, socklen_t *__restrict);
 
 ssize_t send (int, const void *, size_t, int);
 ssize_t recv (int, void *, size_t, int);
-ssize_t sendto (int, const void *, size_t, int, const struct sockaddr *, socklen_t);
-ssize_t recvfrom (int, void *__restrict, size_t, int, struct sockaddr *__restrict, socklen_t *__restrict);
+ssize_t sendto (int, const void *, size_t, int, const char*, int, int);
+ssize_t recvfrom (int, void *__restrict, size_t, int, char*, int, int*);
 ssize_t sendmsg (int, const struct msghdr *, int);
 ssize_t recvmsg (int, struct msghdr *, int);
 

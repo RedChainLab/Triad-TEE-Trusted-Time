@@ -29,6 +29,17 @@
 #
 #
 
+######## AEX Test Settings ########
+
+SGX_TYPE?=1
+SLEEP_TIME?=10
+SLEEP_TYPE?=0
+CORE_MAIN?=1
+CORE_ADD?=2
+VERBOSITY?=1
+
+LOG_FILE?=aex-$(SGX_TYPE)-$(SLEEP_TYPE)-$(SLEEP_TIME)-$(VERBOSITY)-$(shell date +'%Y-%m-%d-%H-%M-%S').csv
+
 ######## SGX SDK Settings ########
 
 SGX_SDK ?= /opt/intel/sgxsdk
@@ -66,7 +77,7 @@ else
 	SGX_COMMON_FLAGS += -O2
 endif
 
-SGX_COMMON_FLAGS += -Wall -Wextra -Winit-self -Wpointer-arith -Wreturn-type \
+SGX_COMMON_FLAGS += -Wall -Wa,-aslh -Wextra -Winit-self -Wpointer-arith -Wreturn-type \
                     -Waddress -Wsequence-point -Wformat-security \
                     -Wmissing-include-dirs -Wfloat-equal -Wundef -Wshadow \
                     -Wcast-align -Wcast-qual -Wconversion -Wredundant-decls
@@ -182,11 +193,27 @@ else
 all: $(App_Name) $(Signed_Enclave_Name)
 endif
 
+deps:
+	sudo apt-get install -y python3 python3-pip
+	sudo apt-get install -y dvipng texlive-latex-extra texlive-fonts-recommended cm-super
+	pip3 install -r requirements.txt
+
+build: all
+
 run: all
 ifneq ($(Build_Mode), HW_RELEASE)
-	@$(CURDIR)/$(App_Name)
+	@echo $(CURDIR)/$(App_Name) $(SGX_TYPE) $(SLEEP_TIME) $(SLEEP_TYPE) $(VERBOSITY) $(CORE_MAIN) $(CORE_ADD)
+	@$(CURDIR)/$(App_Name) $(SGX_TYPE) $(SLEEP_TIME) $(SLEEP_TYPE) $(VERBOSITY) $(CORE_MAIN) $(CORE_ADD)
 	@echo "RUN  =>  $(App_Name) [$(SGX_MODE)|$(SGX_ARCH), OK]"
 endif
+
+exp: all
+	@echo $(CURDIR)/$(App_Name) $(SGX_TYPE) $(SLEEP_TIME) $(SLEEP_TYPE) $(VERBOSITY) $(CORE_MAIN) $(CORE_ADD) > $(CURDIR)/$(LOG_FILE)
+	@$(CURDIR)/$(App_Name) $(SGX_TYPE) $(SLEEP_TIME) $(SLEEP_TYPE) $(VERBOSITY) $(CORE_MAIN) $(CORE_ADD) > $(CURDIR)/$(LOG_FILE)
+	@echo "RUN  =>  $(App_Name) [$(SGX_MODE)|$(SGX_ARCH), OK]"
+
+tsc: all
+	g++ -o tsc tsc_offsetter/tsc_offsetter.cpp
 
 ######## App Objects ########
 
@@ -246,4 +273,4 @@ endif
 
 .PHONY: clean
 clean:
-	@rm -f $(App_Name) $(Enclave_Name) $(Signed_Enclave_Name) $(App_Cpp_Objects) App/Enclave_u.* $(Enclave_Cpp_Objects) Enclave/Enclave_t.*
+	@rm -f $(App_Name) $(Enclave_Name) $(Signed_Enclave_Name) $(App_Cpp_Objects) App/Enclave_u.* $(Enclave_Cpp_Objects) Enclave/Enclave_t.* tsc

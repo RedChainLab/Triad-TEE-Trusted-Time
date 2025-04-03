@@ -30,15 +30,17 @@
  */
 
 
-
 #include <unistd.h>
-#ifdef M_TLS_SERVER
-#include "../server/host/tls_server_u.h"
-#else
-#include "../client/host/tls_client_u.h"
-#endif
-
+#include "sys/socket.h"
+#include "netinet/in.h"
+#include <cstdio>
+#include <arpa/inet.h>
+#include <cstring>
 /* ocalls to use socket APIs , call socket syscalls */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 int u_socket(int domain, int type, int protocol)
 {
@@ -102,3 +104,33 @@ int u_close(int fd)
 {
     return close(fd);
 }
+
+ssize_t u_sendto(int sockfd, const void *buf, size_t len, int flags, const char* ip, int iplen, int port)
+{
+    struct sockaddr_in dest_addr;
+    dest_addr.sin_family = AF_INET;
+    dest_addr.sin_port = htons(port);
+    dest_addr.sin_addr.s_addr = inet_addr(ip);
+    socklen_t addrlen = sizeof(dest_addr);
+    return sendto(sockfd, buf, len, flags, (struct sockaddr*)&dest_addr, addrlen);
+}
+
+ssize_t u_recvfrom(int sockfd, void *buf, size_t len, int flags, char* ip, int iplen, int* port)
+{
+    struct sockaddr_in cliAddr;
+    socklen_t cliAddrLen = sizeof(cliAddr);
+    char buff[1024] = {0};
+    //printf("[utrst]> %d, %p, %ld, %d, %p, %p\r\n", sockfd, buf, len, flags, (struct sockaddr*)&cliAddr, &cliAddrLen);
+    ssize_t ret=recvfrom(sockfd, buf, len, flags, (struct sockaddr*)&cliAddr, &cliAddrLen);
+    char *ipaddr = inet_ntoa(cliAddr.sin_addr);
+    //printf("[utrst]> %d, %p, %ld, %d, %s, %d\r\n", sockfd, buf, len, flags, ipaddr, ntohs(cliAddr.sin_port));
+    strcpy(ip, ipaddr);
+    *port = ntohs(cliAddr.sin_port);
+    //printf("[utrst]> %d, %p, %ld, %d, %s, %d\r\n", sockfd, buf, len, flags, ip, *port);
+    //printf("[utrst]> msg size: %ld\r\n", ret);
+    return ret;
+}
+
+#ifdef __cplusplus
+}
+#endif
