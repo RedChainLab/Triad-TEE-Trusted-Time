@@ -108,7 +108,7 @@ with `<target-core>` and `<read-core>` the same as before and `<offset_seconds>`
 
 To set the core frequency, use:
 ``` sh
-cpupower -c <core-list> frequency-set <MHz-frequency>
+cpupower -c <core-list> frequency-set --{min|max} <MHz-frequency>
 ```
 e.g.:
 ``` sh
