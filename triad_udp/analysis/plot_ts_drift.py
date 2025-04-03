@@ -11,6 +11,11 @@ params = {'text.usetex' : True,
           }
 plt.rcParams.update(params) 
 
+# x-axis params
+MAJOR_TICKS=600 #240 #600 #60
+MINOR_TICKS=100 #60 #100 #10
+LOW_INTERRUPTS = True
+
 # Files in out/count directory are in the naming format count-<timestamp>-<sgx_type>-<sleep_type>-<sleep_time_secs>-<repeat_id>.csv
 # Get <sleep_type> <sleep_time_secs> from command line arguments
 vlines=[]
@@ -118,11 +123,11 @@ fig_ax = [plt.subplots(figsize=(4.5,1.5)) for _ in range(NB_FIGS)]
 
 fig, ax = zip(*fig_ax)
 
-colors=["tab:blue","tab:orange","tab:green"]
+colors=["tab:blue","tab:orange","black"]
 linestyles=["-","--",":"]
 for (idx, group), color in zip(enumerate(merged.groupby("ID_node")), colors):
   ax[0].plot(group[1]["datetime_ref"], group[1]["drift"], marker='+', markersize=3, linestyle="-", linewidth=0.5, label=f"Node {1+int(group[0][:-2])%12345}", color=color,
-              zorder=4-idx
+             zorder=4-idx
              )
 
 for (idx, group), color, linestyle in zip(enumerate(aex_df.groupby("ID")), colors, linestyles):
@@ -151,9 +156,6 @@ ax[4].grid(axis="x", which='minor', linestyle=':', linewidth='0.5')
 ax[4].set_yticks([0,1,2,3])
 ax[4].set_yticklabels(["OK","Tainted","RefCalib","FullCalib"])
 ax[4].minorticks_on()
-
-MAJOR_TICKS=60 #240 #600 #60
-MINOR_TICKS=10 #60 #60 #10
 for axis in ax:
   axis.set_xlabel('Reference time (s)')
   axis.set_xticks(np.arange(0, min(3601,math.ceil(merged["datetime_ref"].max()+1)), MAJOR_TICKS))
@@ -167,6 +169,8 @@ ax[3].set_ylabel('Peer response count')
 ax[4].set_ylabel('Node state')
 # ax[0].set_xlim(0)
 ax[2].legend(loc='lower right', fontsize='small')
+ax[1].legend(loc='lower right', fontsize='small')
+# ax[0].legend(loc='lower left', fontsize='small')
 
 for vline in vlines:
   for a in ax:
@@ -248,7 +252,6 @@ ax3.set_yticks(np.arange(0, 1.01, 0.25))
 ax3.set_yticks(np.arange(0, 1.01, 0.05), minor=True)
 ax3.set_yticklabels(['{:.0f}\\%'.format(x * 100) for x in ax3.get_yticks()])
 
-LOW_INTERRUPTS = False
 if LOW_INTERRUPTS:
   max_x_value = math.ceil(mem_aex_df["delay"].max())
   closest_multiple_of_60 = (max_x_value // 60 + 1) * 60
