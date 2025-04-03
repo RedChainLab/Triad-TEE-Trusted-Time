@@ -1,10 +1,10 @@
-# AEX Test
+# Triad
 
-This project measures the number of [AEX-Notify](https://www.intel.com/content/www/us/en/content-details/736463/white-paper-asynchronous-enclave-exit-notify-and-the-edeccssa-user-leaf-function.html) events that occur during a given amount of time.
+This repository contains the source code for the Triad TEE Trusted Time protocol, as well as scripts to run experiments and generate figures.
+
+*Complete deployment and reproducibility guide coming soon.*
 
 ## Functionalities
-
-The project makes one thread increment a counter and monitors the number of AEX Notify events that occur during this counting. Another thread handles the delay measurement, either by sleeping outside of the enclave (i.e., using a standard `sleep`), or by running code for a while.
 
 ## Dependencies
 
