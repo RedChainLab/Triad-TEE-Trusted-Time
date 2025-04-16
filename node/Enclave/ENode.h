@@ -83,6 +83,9 @@ typedef struct {
 
     bool* calib_ts_ref;
     bool* calib_count;
+
+    long long int* curr_tsc;
+    double* tsc_freq;
 }aex_handler_args_t;
 
 typedef struct {
@@ -148,7 +151,6 @@ private:
 
     long long tsc_ref;
     timespec ts_ref;
-    timespec ts_curr;
 
     long long int calib_msg_count;
     static const int NB_CALIB_MSG = 1;

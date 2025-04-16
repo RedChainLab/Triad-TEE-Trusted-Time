@@ -91,6 +91,16 @@ inline void log_aex(long long int* arr, long long int& next_index, long long int
     }
 }
 
+inline long long int rdtscp(void){
+    /*
+    Read the TSC register
+    */
+    unsigned int lo, hi;
+    __asm__ __volatile__("rdtscp" : "=a" (lo), "=d" (hi));
+    //t_print("lo: %d, hi: %d\n", lo, hi);
+    return ((uint64_t)hi << 32) | lo;
+}
+
 static void aex_handler(const sgx_exception_info_t *info, const void * args)
 {
     /*
@@ -111,21 +121,22 @@ static void aex_handler(const sgx_exception_info_t *info, const void * args)
     {
         ocall_timespec_print(&ts_ref, aex_args->port, TAINTED);
     }
+
+    long long int mem_tsc=*(aex_args->curr_tsc);
+    long long int postaex_tsc=rdtscp();
+
+    long long int total_nsec = (long long)((double)(postaex_tsc-mem_tsc)/(*aex_args->tsc_freq));
+    printf("[Handler %d]> AEX TSC: PREAEX_TSC=%lld, POSTAEX_TSC=%lld, DELTA=%lldns, TSCfreq=%.3f\r\n", aex_args->port, mem_tsc, postaex_tsc, total_nsec, *aex_args->tsc_freq);
+    if(total_nsec<0)
+    {
+        printf("[Handler %d]> Error: Negative TSC difference detected!\r\n", aex_args->port);
+    }
+    
     // printf("[Handler %d]> Reference time: %ld.%09ld UTC\n", aex_args->port, ts_ref.tv_sec, ts_ref.tv_nsec);
     sgx_thread_cond_signal(aex_args->tainted_cond);
     sgx_thread_mutex_unlock(aex_args->tainted_mutex);
 
     log_aex(aex_args->count_aex, *(aex_args->aex_count), aex_args->add_count);
-}
-
-inline long long int rdtscp(void){
-    /*
-    Read the TSC register
-    */
-    unsigned int lo, hi;
-    __asm__ __volatile__("rdtscp" : "=a" (lo), "=d" (hi));
-    //t_print("lo: %d, hi: %d\n", lo, hi);
-    return ((uint64_t)hi << 32) | lo;
 }
 
 void ENode::untaint_trigger()
@@ -223,6 +234,9 @@ ENode::ENode(int _port, int _sleep_attack_ms):port(_port), stop(false),
     
     aex_args.calib_ts_ref = &calib_ts_ref;
     aex_args.calib_count = &calib_count;
+
+    aex_args.curr_tsc = &tsc;
+    aex_args.tsc_freq = &tsc_freq;
 
     incrementNonce();
     //randombytes_buf(key, sizeof(key));
@@ -607,7 +621,6 @@ bool ENode::calibrate()
     {
         ocall_timespec_get(&ts_ref);
         ocall_timespec_print(&ts_ref, this->port, TA);
-        ts_curr = ts_ref;
         tsc_ref = rdtscp();
         eprintf("Ref. TSC: %lld\r\n", tsc_ref);
         calib_ts_ref=true;
