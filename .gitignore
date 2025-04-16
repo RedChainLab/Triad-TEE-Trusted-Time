@@ -6,7 +6,6 @@
 *_t.h
 *.so
 *.o
-app
 build
 tls_server_host
 ssl_client
