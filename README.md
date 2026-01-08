@@ -1,10 +1,6 @@
-# Triad
+# An Open-source Implementation and Security Analysis of Triad's TEE Trusted Time Protocol (DSN-S'25)
 
-This repository contains the source code for the Triad TEE Trusted Time protocol, as well as scripts to run experiments and generate figures.
-
-*Complete deployment and reproducibility guide coming soon.*
-
-## Functionalities
+This repository contains the source code for the open implementation of the Triad TEE Trusted Time protocol [[Fernandez et al., 2023](https://doi.org/10.1109/CloudCom59040.2023.00037)], as well as scripts to run experiments and attacks on Triad, as well as generate figures presented in the paper "An Open-source Implementation and Security Analysis of Triad's TEE Trusted Time Protocol" published at the DSN'25 conference ([doi:10.1109/DSN-S65789.2025.00053](http://dx.doi.org/10.1109/DSN-S65789.2025.00053)).
 
 ## Dependencies
 
