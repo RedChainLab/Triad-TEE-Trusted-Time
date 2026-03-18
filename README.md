@@ -2,6 +2,23 @@
 
 This repository contains the source code for the open implementation of the Triad TEE Trusted Time protocol [[Fernandez et al., 2023](https://doi.org/10.1109/CloudCom59040.2023.00037)], as well as scripts to run experiments and attacks on Triad, as well as generate figures presented in the paper "An Open-source Implementation and Security Analysis of Triad's TEE Trusted Time Protocol" published at the DSN'25 conference ([doi:10.1109/DSN-S65789.2025.00053](http://dx.doi.org/10.1109/DSN-S65789.2025.00053)).
 
+## How to cite
+```
+M. Bettinger, S. Ben Mokhtar and A. Simonet-Boulogne, "An Open-source Implementation and Security Analysis of Triad’s TEE Trusted Time Protocol," 2025 55th Annual IEEE/IFIP International Conference on Dependable Systems and Networks - Supplemental Volume (DSN-S), Naples, Italy, 2025, pp. 133-139, doi: 10.1109/DSN-S65789.2025.00053.
+```
+```bib
+@INPROCEEDINGS{11068371,
+  author={Bettinger, Matthieu and Ben Mokhtar, Sonia and Simonet-Boulogne, Anthony},
+  booktitle={2025 55th Annual IEEE/IFIP International Conference on Dependable Systems and Networks - Supplemental Volume (DSN-S)}, 
+  title={An Open-source Implementation and Security Analysis of Triad’s TEE Trusted Time Protocol}, 
+  year={2025},
+  volume={},
+  number={},
+  pages={133-139},
+  keywords={Trusted computing;Protocols;Scheduling algorithms;Operating systems;Control systems;Delays;Security;Logic;Resilience;Clocks;resilience;delay attack;trusted execution environment (TEE);trusted time},
+  doi={10.1109/DSN-S65789.2025.00053}
+}
+```
 ## Dependencies
 
 - SGX-enabled hardware (AEX Notify handlers only work in hardware mode, not in simulation)
